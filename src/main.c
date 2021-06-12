@@ -9,6 +9,7 @@
 
 void main(void)
 {
+	return;
 	printf("Hello, world! %s\n", CONFIG_BOARD);
 
 	const struct device *gpio_port_dev;
