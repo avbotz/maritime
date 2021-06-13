@@ -12,9 +12,12 @@ void pubsub_topic_init(struct pubsub_topic_s *topic, size_t size)
 	
 	sys_slist_init(&(topic->subscribers));
 	for (size_t i = 0;i < MAX_CHANNELS;i++) {
-		topic->message[i].size = size;
-		topic->message[i].data = k_malloc(size);
+		/*topic->message[i].size = size;*/
+		/*topic->message[i].data = k_malloc(size);*/
+		topic->message[i] = k_malloc(size);
 	}
+
+	topic->size = size;
 
 	topic->init = true;
 }
@@ -34,9 +37,9 @@ void pubsub_subscriber_notify(struct pubsub_subscriber_s *subscriber)
 	subscriber->updated = true;
 }
 
-void pubsub_publish(struct pubsub_topic_s *topic, size_t channel, void *data, size_t size)
+void pubsub_publish(struct pubsub_topic_s *topic, size_t channel, void *data)
 {
-	memcpy(topic->message[channel].data, data, size);
+	memcpy(topic->message[channel], data, topic->size);
 
 	struct pubsub_subscriber_s *sub;
 	struct pubsub_subscriber_s *s_sub;
@@ -59,5 +62,5 @@ void *pubsub_receive(struct pubsub_subscriber_s *subscriber)
 
 	subscriber->updated = false;
 
-	return subscriber->topic->message[subscriber->channel].data;
+	return subscriber->topic->message[subscriber->channel];
 }

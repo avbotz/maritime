@@ -16,7 +16,8 @@ struct pubsub_topic_s {
 	bool init;
 	sys_slist_t subscribers;
 
-	struct pubsub_message_s message[MAX_CHANNELS];
+	size_t size;
+	void *message[MAX_CHANNELS];
 };
 
 struct pubsub_subscriber_s {
@@ -31,7 +32,7 @@ void pubsub_topic_init(struct pubsub_topic_s *topic, size_t size);
 void pubsub_subscriber_register(struct pubsub_topic_s *topic,
 		struct pubsub_subscriber_s *subscriber, size_t channel);
 void pubsub_subscriber_notify(struct pubsub_subscriber_s *subscriber);
-void pubsub_publish(struct pubsub_topic_s *topic, size_t channel, void *data, size_t size);
+void pubsub_publish(struct pubsub_topic_s *topic, size_t channel, void *data);
 bool pubsub_subscriber_updated(struct pubsub_subscriber_s *subscriber);
 void *pubsub_receive(struct pubsub_subscriber_s *subscriber);
 
