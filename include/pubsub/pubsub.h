@@ -7,11 +7,6 @@
 
 #define MAX_CHANNELS 4
 
-struct pubsub_message_s {
-	size_t size;
-	void *data;
-};
-
 struct pubsub_topic_s {
 	bool init;
 	sys_slist_t subscribers;
