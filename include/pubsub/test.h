@@ -6,6 +6,8 @@
 struct test_msg_s {
 	int val1;
 	int val2;
+
+	int64_t timestamp;
 };
 
 extern struct pubsub_topic_s test_topic;
