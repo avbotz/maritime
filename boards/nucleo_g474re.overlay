@@ -1,0 +1,34 @@
+/ {
+	aliases {
+		uart3 = &usart3;
+
+		max485-thruster = &max485_0;
+	};
+};
+
+/* usart1 connected to MAX485 chip, used for thruster communication over RS-485 */
+&usart1 {
+	pinctrl-0 = <&usart1_tx_pc4 &usart1_rx_pc5>;
+	current-speed = <115200>;
+	status = "okay";
+
+	dmas = <&dmamux1 2 25 0x440 0>,
+		   <&dmamux1 1 24 0x480 0>;
+	dma-names = "tx", "rx";
+
+	max485_0: max485_0 {
+		status = "okay";
+		label = "MAX485_0";
+		compatible = "maxim,max485";
+		de-gpios = <&gpioc 6 GPIO_ACTIVE_HIGH>;
+		re-gpios = <&gpioc 5 GPIO_ACTIVE_LOW>;
+	};
+};
+
+&dma1 {
+	status = "okay";
+};
+
+&dmamux1 {
+	status = "okay";
+};
