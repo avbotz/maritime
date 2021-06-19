@@ -6,216 +6,184 @@
  * @author Kalyan Sriram <kalyan@coderkalyan.com>
  */
 
+#include <logging/log.h>
+#include <sys/ring_buffer.h>
+
 #include <zephyr.h>
 #include <device.h>
 #include <drivers/gpio.h>
 #include <drivers/uart.h>
-#include <logging/log.h>
-#include <sys/ring_buffer.h>
+
+#include <pubsub/pubsub.h>
+#include <pubsub/thruster_output.h>
 
 #include "thruster.h"
 
 LOG_MODULE_REGISTER(thruster, LOG_LEVEL_DBG);
+/*LOG_MODULE_REGISTER(thruster, LOG_LEVEL_ERR);*/
 
 #define THRUSTER_STACK_SIZE 1024
 #define THRUSTER_PRIORITY 1
 
-#define RING_BUF_SIZE 1024
-uint8_t ring_buffer[RING_BUF_SIZE];
+/* standard thruster command for 8 thrusters is 48 bytes
+ * if we, say, want to queue 4 messages, which is 192 bytes
+ * Doesn't really matter, but we're choosing a power of two
+ * (256 byte buffer)
+ *
+ * note that only the data item version of the zephyr ring buffer
+ * implementation (which stores 32-bit word data items) benefits from
+ * using a power of 2; we want a byte mode buffer though
+ *
+ * note that this a rough estimate and does not take into account
+ * any sending limitations or other messages
+ *
+ * note also that if you are actually queued up by 5 or more messages,
+ * you're doing something wrong and should probably look into
+ * your loop timings
+ */
+#define THRUSTER_RING_BUF_SIZE 256
+RING_BUF_DECLARE(tx_ring_buf, THRUSTER_RING_BUF_SIZE);
+RING_BUF_DECLARE(rx_ring_buf, THRUSTER_RING_BUF_SIZE);
 
-struct ring_buf ringbuf;
+static struct pubsub_subscriber_s thruster_output_sub;
 
-void uart_isr(const struct device *dev)
+#define MAX485_NODE DT_ALIAS(max485_thruster)
+#if DT_NODE_HAS_STATUS(MAX485_NODE, okay)
+#define MAX485_UART_NODE DT_BUS(MAX485_NODE)
+#define MAX485_UART_LABEL DT_LABEL(MAX485_UART_NODE)
+#else
+#error "Compatible MAX485 node not found."
+#endif
+
+/* TODO: disabling DMA completely for now, add back when it works */
+static bool uart_transmit_dma(const struct device *dev)
 {
-	/*static int idx = 0;*/
-	static bool filled = false;
-	/*LOG_DBG("ISR");*/
-	printf("ISR\n");
-	/*struct device *gpio = user_data;*/
-	/*const struct device *gpio = device_get_binding("GPIOC");*/
-	while (uart_irq_update(dev) && uart_irq_is_pending(dev)) {
-		if (uart_irq_tx_ready(dev)) {
-			uint8_t buffer[] = {'H','e','l','l','o'};
-			if (!filled) {
-				uart_fifo_fill(dev, buffer, sizeof(buffer));
-				filled = true;
-			} else {
-				uart_irq_tx_disable(dev);
-			}
-			printf("Done? %d\n", uart_irq_tx_complete(dev));
-			/*gpio_pin_set(gpio, 6, 1);*/
-			/*uart_fifo_fill(dev, buffer, sizeof(buffer));*/
-		} else if (uart_irq_tx_complete(dev)) {
-			/*gpio_pin_set(gpio, 6, 0);*/
-			/*printf("Done\n");*/
-			/*uart_irq_tx_disable(dev);*/
-		}
+	/* TODO: having a buffer size of 1 byte completely removes the point
+	 * of using DMA. However, larger buffer sizes (although they should work)
+	 * are giving me issues, and I've spent too long staring at the UART driver.
+	 * This should be revisited some time, but for now it's not a big problem
+	 * as performance isn't being hit much anyway. (one might question why we 
+	 * are using DMA in the first place then :)
+	 *
+	 * The issues were around reliability of the data, sometimes some bytes were
+	 * not being sent correctly. I suspect this might have nothing to do with DMA and
+	 * everything to do with a memory leak or something not being zeroed correctly. */
+	uint8_t buffer[1];
+	int rb_len, ret;
+
+	rb_len = ring_buf_get(&tx_ring_buf, buffer, sizeof(buffer));
+	if (!rb_len) {
+		return true;
 	}
-/*
+
+	ret = uart_tx(dev, buffer, rb_len, 100);
+	if (ret != 0) {
+		LOG_ERR("Unable to transmit UART: %d", ret);
+	}
+
+	return false;
+}
+
+static void uart_dma_isr(const struct device *dev, struct uart_event *event, void *data)
+{
+	struct device *gpio = data;
+
+	switch (event->type) {
+	case UART_TX_DONE:;
+		bool finished = uart_transmit_dma(dev);
+		if (finished) {
+			gpio_pin_set(gpio, 6, 0);
+		}
+
+		break;
+	};
+}
+
+static void uart_isr(const struct device *dev, void *data)
+{
+	struct device *gpio = data;
+
 	while (uart_irq_update(dev) && uart_irq_is_pending(dev)) {
-		if (uart_irq_rx_ready(dev)) {
-			int recv_len, rb_len;
-			uint8_t buffer[64];
-			size_t len = MIN(ring_buf_space_get(&ringbuf),
-					 sizeof(buffer));
+		/* TODO: implement RX functionality as needed */
+		if (uart_irq_tx_complete(dev) && ring_buf_is_empty(&tx_ring_buf)) {
+			gpio_pin_set(gpio, 6, 0);
+			uart_irq_tx_disable(dev);
 
-			recv_len = uart_fifo_read(dev, buffer, len);
-
-			rb_len = ring_buf_put(&ringbuf, buffer, recv_len);
-			if (rb_len < recv_len) {
-				LOG_ERR("Drop %u bytes", recv_len - rb_len);
-			}
-
-			LOG_DBG("tty fifo -> ringbuf %d bytes", rb_len);
-
-			uart_irq_tx_enable(dev);
+			break;
 		}
 
 		if (uart_irq_tx_ready(dev)) {
-			uint8_t buffer[64];
 			int rb_len, send_len;
 
-			rb_len = ring_buf_get(&ringbuf, buffer, sizeof(buffer));
+			/* TODO: can the TX fifo handle multiple bytes?
+			 * CDCACM can but UART doesn't seem to
+			 * STM32G4 datasheet says the TX fifo is only 1 byte,
+			 * but this should be verified */
+			uint8_t buffer[1];
+
+			rb_len = ring_buf_get(&tx_ring_buf, buffer, sizeof(buffer));
 			if (!rb_len) {
-				LOG_DBG("Ring buffer empty, disable TX IRQ");
-				uart_irq_tx_disable(dev);
 				continue;
 			}
 
 			send_len = uart_fifo_fill(dev, buffer, rb_len);
 			if (send_len < rb_len) {
-				LOG_ERR("Drop %d bytes", rb_len - send_len);
+				LOG_ERR("tx: Dropping %d bytes", rb_len - send_len);
 			}
-
-			LOG_DBG("ringbuf -> tty fifo %d bytes", send_len);
 		}
-	}*/
-	/*uart_irq_update(unused);*/
-
-	/*int recv_len;*/
-	/*uint8_t buffer[64];*/
-	/*do {*/
-		/*recv_len = uart_fifo_read(unused, buffer, sizeof(buffer));*/
-		/*uart_fifo_write(unused, )*/
-		/*[>printf(buffer);<]*/
-	/*} while (recv_len > 0);*/
+	}
 }
 
-/*#define DE_NODE DT_NODELABEL(gpioc)*/
 static void thruster_thread(void *unused1, void *unused2, void *unused3)
 {
 	ARG_UNUSED(unused1);
 	ARG_UNUSED(unused2);
 	ARG_UNUSED(unused3);
 
-	ring_buf_init(&ringbuf, sizeof(ring_buffer), ring_buffer);
+	LOG_INF("Initializing thruster control thread");
 
-	/*LOG_INF("Initializing thruster control thread");*/
-
-	int ret;
+	const struct device *max485_uart = device_get_binding(MAX485_UART_LABEL);
+	if (max485_uart == NULL) {
+		LOG_ERR("Unable to bind max485 uart device");
+		return;
+	}
 
 	const struct device *gpio = device_get_binding("GPIOC");
-
 	gpio_pin_configure(gpio, 6, GPIO_OUTPUT | GPIO_ACTIVE_HIGH);
-	gpio_pin_configure(gpio, 5, GPIO_OUTPUT | GPIO_ACTIVE_LOW);
 
-	/*gpio_pin_set(gpio, 6, 1);*/
-	/*gpio_pin_set(gpio, 5, 1);*/
-	/*gpio_pin_set(gpio, 6, 1);*/
-	/*gpio_pin_set(gpio, 5, 0);*/
-
-	/*const struct device *uart = device_get_binding("UART_1");*/
-	const struct device *uart = device_get_binding(DT_LABEL(DT_ALIAS(uart1)));
-	const struct device *uart3 = device_get_binding(DT_LABEL(DT_ALIAS(uart3)));
-	const struct device *lpuart1 = device_get_binding(DT_LABEL(DT_ALIAS(lpuart1)));
-
-	printf("%d %d\n", uart, lpuart1);
-
-	/*if (uart == NULL) printf("null\n");*/
-
-	/*struct uart_config cfg;*/
-	/*uart_config_get(uart, &cfg);*/
-
-	/*printf("Sending %d %d %d %d %d\n", cfg.baudrate, cfg.parity,*/
-			/*cfg.stop_bits, cfg.data_bits, cfg.flow_ctrl);*/
-
-	/*uart_irq_callback_set(uart, uart_isr);*/
-	/*uart_irq_rx_enable(uart);*/
-	/*uint8_t buffer[] = {'H', 'e', 'l', 'l', 'o', ',', ' ', 'w', 'o', 'r', 'l', 'd', '!'};*/
-	char *data = "Hello, world!";
-	/*char *data = 0x42;*/
+	/*uart_callback_set(max485_uart, uart_dma_isr, gpio);*/
+	uart_irq_callback_user_data_set(max485_uart, uart_isr, gpio);
 
 	uint8_t buffer[COMMAND_PROPULSION_LEN];
 	memset(buffer, 0, COMMAND_PROPULSION_LEN);
-	struct csr_command_propulsion_s prop;
-	memset(prop.power, 0, sizeof(prop.power));
-	/*for (int i = 0;i < 8;i++) prop.power[i] = 0.1;*/
-	prop.power[7] = 0.1;
-	prop.enable_response = true;
-	csr_command_propulsion_pack(buffer, &prop);
-	/*for (int i = 0;i < COMMAND_PROPULSION_LEN;i++) buffer[i] = 'H';*/
-	/*buffer[0] = 'H';*/
-	/*buffer[1] = 'e';*/
 
-	printf("Hi\n");
-	/*uart_irq_callback_set(uart, uart_isr);*/
-	/*uart_irq_tx_enable(uart);*/
-	/*uart_irq_rx_enable(uart);*/
+	pubsub_subscriber_register(&thruster_output_topic, &thruster_output_sub, 0);
 
-	printf("done\n");
+	struct thruster_output_s thruster_output;
+	int ret;
 
-	/*return;*/
-	/*gpio_pin_set(gpio, 6, 1);*/
-	/*uart_fifo_write*/
-	gpio_pin_set(gpio, 6, 1);
-	k_sleep(K_MSEC(1));
-	for (int i = 0;i < COMMAND_PROPULSION_LEN;i++) {
-		printf("%02x ", buffer[i]);
-		/*char c;*/
-		/*sprintf(&c, "%x2", buffer[i]);*/
-		uart_poll_out(uart, buffer[i]);
-		/*uart_poll_out(uart, c);*/
-		/*uart_poll_out(uart, 0x0d);*/
-	}
-	k_sleep(K_MSEC(1));
-	gpio_pin_set(gpio, 6, 0);
-
-	/*
 	while (1) {
-		for (int i = 0;i < strlen(data);i++) {
+		ret = pubsub_poll(&thruster_output_sub, K_MSEC(10));
+		if (ret > 0) {
+			pubsub_copy(&thruster_output_sub, &thruster_output);
+
+			struct csr_command_propulsion_s prop;
+
+			memset(&prop, 0, sizeof(prop));
+			prop.enable_response = false;
+			memcpy(prop.power, thruster_output.power, sizeof(thruster_output.power));
+
+			csr_command_propulsion_pack(buffer, &prop);
+
+			ring_buf_put(&tx_ring_buf, buffer, COMMAND_PROPULSION_LEN);
 			gpio_pin_set(gpio, 6, 1);
-			k_sleep(K_MSEC(1));
-			uart_poll_out(uart, data[i]);
-			k_sleep(K_MSEC(1));
-			gpio_pin_set(gpio, 6, 0);
+			uart_irq_tx_enable(max485_uart);
+		} else if (ret == 0) {
+			LOG_WRN("Did not receive new thruster output data for over 10ms");
+		} else {
+			LOG_ERR("Error polling for thruster output: %d", ret);
 		}
-
-		k_sleep(K_MSEC(250));
 	}
-	*/
-	/*gpio_pin_set(gpio, 5, 0);*/
-
-	/*while (1) {*/
-		/*char c;*/
-		/*ret = uart_poll_in(uart, &c);*/
-		/*if (ret == 0) {*/
-			/*printf("Rx: %s\n", ret);*/
-		/*} else {*/
-			/*printf("None");*/
-		/*}*/
-
-		/*printf(c);*/
-	/*}*/
-	/*uart_poll_out(uart, data);*/
-	/*ret = uart_tx(uart, buffer, 1, SYS_FOREVER_MS);*/
-
-	/*while (1) {*/
-		/*ret = uart_irq_rx_ready(uart);*/
-		/*printf("RX: %d\n", ret);*/
-
-		/*k_sleep(K_MSEC(1));*/
-	/*}*/
-	/*printf("Sent %d\n", ret);*/
 }
 
 K_THREAD_DEFINE(thruster_thread_id, THRUSTER_STACK_SIZE,

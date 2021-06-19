@@ -1,0 +1,21 @@
+description: Maxim Integrated MAX485 RS-485 converter
+
+compatible: "maxim,max485"
+
+include: [base.yaml, uart-device.yaml]
+
+properties:
+  label:
+    required: true
+    type: string
+    description: Human readable string describing the device
+
+  re-gpios:
+    type: phandle-array
+    required: true
+    description: Receiver enable GPIO pin
+
+  de-gpios:
+    type: phandle-array
+    required: true
+    description: Driver enable GPIO pin
