@@ -1,0 +1,26 @@
+/ {
+    aliases {
+        imu = &mpu6050;
+        mag = &ak8975;
+    };
+};
+
+&i2c1 {
+	status = "okay";
+	clock-frequency = <I2C_BITRATE_FAST>;
+
+	mpu6050: mpu6050@68 {
+		compatible = "invensense,mpu6050";
+		reg = <0x68>;
+		status = "okay";
+		label = "MPU6050";
+		int-gpios = <&gpioa 4 GPIO_ACTIVE_HIGH>;
+	};
+
+	ak8975: ak8975@48 {
+		compatible = "asahi-kasei,ak8975";
+		reg = <0x48>;
+		status = "okay";
+		label = "AK8975";
+	};
+};

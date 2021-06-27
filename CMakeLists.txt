@@ -6,8 +6,9 @@ target_include_directories(app PRIVATE include)
 
 target_sources(app PRIVATE
 	src/pubsub/pubsub.c
-	src/thruster/csr.c
-	src/thruster/thruster.c
-	src/thruster/dummy_thruster_output.c
+    src/ahrs/ahrs.c
+    # src/thruster/csr.c
+	# src/thruster/thruster.c
+	# src/thruster/dummy_thruster_output.c
 	src/main.c
 )
