@@ -45,7 +45,7 @@ LOG_MODULE_REGISTER(thruster, LOG_LEVEL_DBG);
 RING_BUF_DECLARE(tx_ring_buf, THRUSTER_RING_BUF_SIZE);
 RING_BUF_DECLARE(rx_ring_buf, THRUSTER_RING_BUF_SIZE);
 
-static struct pubsub_subscriber_s thruster_output_sub;
+PUBSUB_SUBSCRIBER_DEFINE(thruster_output_topic, thruster_output_sub, 0);
 
 #define MAX485_NODE DT_ALIAS(max485_thruster)
 #if DT_NODE_HAS_STATUS(MAX485_NODE, okay)
@@ -95,6 +95,8 @@ static void uart_dma_isr(const struct device *dev, struct uart_event *event, voi
 			gpio_pin_set(gpio, 6, 0);
 		}
 
+		break;
+	finally:
 		break;
 	};
 }
@@ -156,8 +158,6 @@ static void thruster_thread(void *unused1, void *unused2, void *unused3)
 
 	uint8_t buffer[COMMAND_PROPULSION_LEN];
 	memset(buffer, 0, COMMAND_PROPULSION_LEN);
-
-	pubsub_subscriber_register(&thruster_output_topic, &thruster_output_sub, 0);
 
 	struct thruster_output_s thruster_output;
 	int ret;

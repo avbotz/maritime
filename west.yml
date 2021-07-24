@@ -1,0 +1,8 @@
+manifest:
+  remotes:
+    - name: pubsub
+      url-base: https://github.com/coderkalyan
+  projects:
+    - name: pubsub
+      path: modules/lib/pubsub
+      remote: pubsub
