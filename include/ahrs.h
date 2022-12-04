@@ -4,16 +4,13 @@
 #ifndef AHRS_H
 #define AHRS_H
 
-struct imu_sample {
+struct ahrs_sample {
 	int64_t timestamp;
   double accel[3];
 	double gyro[3];
-  double temperature;
-};
-
-struct magnetometer_sample {
-	int64_t timestamp;
-  double magn[3];
+	double magn[3];
+	double rotation;
+	double temperature
 };
 
 void init_ahrs(struct k_msgq *ahrs_msgq, struct k_msgq *attitude_msgq);
