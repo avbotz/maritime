@@ -9,7 +9,7 @@
 #include "threads.h"
 #include "pressure_sensor.h"
 
-LOG_MODULE_REGISTER(dvl, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(pressure_sensor, LOG_LEVEL_DBG);
 
 int sample_pressure_sensor(const struct device *dev, struct pressure_sensor_sample *pressure_sensor_sample)
 {
@@ -24,38 +24,32 @@ int sample_pressure_sensor(const struct device *dev, struct pressure_sensor_samp
 	ret = sensor_channel_get(dev, SENSOR_CHAN_PRESS, &pressure);
 	if (ret != 0) goto end;
 
-	dvl_sample->timestamp = time_now;
-	dvl_sample->pressureKPA = sensor_value_to_double(&pressure);
+	pressure_sensor_sample->timestamp = time_now;
+	pressure_sensor_sample->pressureKPA = sensor_value_to_double(&pressure);
 
 end:
 	return ret;
 }
 
-/* Pressure sensor poll loop for when trigger is not enabled */
-void pressure_sensor_poll_thread_entry(void *arg1, void *arg2, void *unused3)
+static const struct device *get_pressure_sensor_device(void)
 {
-	LOG_DBG("Initializing pressure sensor poll thread");
+	const struct device *const dev = GPIO_DT_SPEC_GET(PRESSURE_SENSOR_NODE, gpios);
 
-	const struct device *dev = (struct device *) arg1;
-
-  //Sets up addresses to queue messages
-	struct k_msgq *pressure_msgq = (struct k_msgq *) arg2;
-
-	struct pressure_sample pressure_sample;
-
-	while (1) {
-    //Draw samples from pressure sensor
-		int pressure_sensor_ret = sample_pressure_sensor(dev, &pressure_sample);
-		if (pressure_sensor_ret != 0) {
-			LOG_ERR("Error sampling pressure sensor: %d", pressure_sensor_ret);
-		}
-
-		while (k_msgq_put(pressure_msgq, &pressure_sample, K_NO_WAIT) != 0) {
-			LOG_ERR("Dropping pressure sensor samples");
-			k_msgq_purge(pressure_msgq);
-		}
-
-		k_sleep(K_MSEC(1)); /* 1Khz poll rate */
+	if (dev == NULL) {
+		/* No such node, or the node does not have status "okay". */
+		printk("\nError: no device found.\n");
+		return NULL;
 	}
+
+	if (!device_is_ready(dev)) {
+		printk("\nError: pressure sensor \"%s\" is not ready; "
+		       "check the driver initialization logs for errors.\n",
+		       dev->name);
+		return NULL;
+	}
+
+	printk("Found pressure sensor \"%s\", getting sensor data\n", dev->name);
+	return dev;
 }
+
 #endif /* PRESSURE_POLL_THREAD */

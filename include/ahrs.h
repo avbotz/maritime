@@ -4,17 +4,25 @@
 #ifndef AHRS_H
 #define AHRS_H
 
-struct ahrs_sample {
+#define IMU_NODE DT_ALIAS(imu)
+#define MAG_NODE DT_ALIAS(mag)
+
+struct imu_sample {
 	int64_t timestamp;
   double accel[3];
 	double gyro[3];
-	double magn[3];
-	double rotation;
 	double temperature
 };
 
-void init_ahrs(struct k_msgq *ahrs_msgq, struct k_msgq *attitude_msgq);
-int process_ahrs(const struct device *dev, struct ahrs_sample *ahrs_sample);
-extern void ahrs_poll_thread_entry(void *, void *, void *);
+struct mag_sample {
+	int64_t timestamp;
+	double magn[3];
+};
+
+void init_imu(struct k_msgq *imu_msgq, struct k_msgq *attitude_msgq);
+int process_imu(const struct device *dev, struct imu_sample *imu_sample);
+
+void init_mag(struct k_msgq *mag_msgq, struct k_msgq *attitude_msgq);
+int process_mag(const struct device *dev, struct mag_sample *mag_sample);
 
 #endif /* AHRS_H */

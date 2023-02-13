@@ -1,0 +1,34 @@
+/ {
+  &usart6 {
+    k1 : ashcroft_pressure_sensor {
+      compatible = "ashcroft,k1";
+      gpios = <&gpioc 15 GPIO_ACTIVE_LOW>;
+      label = "Ashcroft Model K1 Pressure Transducer/Transmitter";
+    };
+
+    icm20689 : ahrs_imu {
+      compatible = "invensense,icm20689";
+      gpios = <&gpioc 16 GPIO_ACTIVE_LOW>;
+      label = "ICM20689 MEMS accelerometer & gyroscope";
+    };
+
+    rm3100 : ahrs_mag {
+      compatible = "witmotion,rm3100";
+      gpios = <&gpioc 17 GPIO_ACTIVE_LOW>;
+      label = "RM3100 magnetometer";
+    };
+
+    a50 : doppler_velocity_log {
+      compatible = "waterlinked,a50";
+      gpios = <&gpioc 18 GPIO_ACTIVE_LOW>;
+      label = "Water Linked DVL A50";
+    }
+  };
+
+  aliases {
+    pressure_sensor = &k1;
+    imu = &icm20689;
+    mag = &rm3100;
+    dvl = &a50;
+  };
+};

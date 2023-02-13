@@ -23,9 +23,9 @@ int sample_dvl(const struct device *dev, struct dvl_sample *dvl_sample)
 
 	ret = sensor_channel_get(dev, SENSOR_CHAN_POS_DX, &posChangeX);
 	if (ret != 0) goto end;
-	ret = sensor_channel_get(dev, SENSOR_CHAN_POS_DX, &posChangeY);
+	ret = sensor_channel_get(dev, SENSOR_CHAN_POS_DY, &posChangeY);
 	if (ret != 0) goto end;
-	ret = sensor_channel_get(dev, SENSOR_CHAN_POS_DX, &posChangeZ);
+	ret = sensor_channel_get(dev, SENSOR_CHAN_POS_DZ, &posChangeZ);
 	if (ret != 0) goto end;
 
 	dvl_sample->timestamp = time_now;
@@ -37,31 +37,25 @@ end:
 	return ret;
 }
 
-/* DVL poll loop for when trigger is not enabled */
-void dvl_poll_thread_entry(void *arg1, void *arg2, void *unused3)
+static const struct device *get_DVL_device(void)
 {
-	LOG_DBG("Initializing DVL poll thread");
+	const struct device *const dev = GPIO_DT_SPEC_GET(DVL_NODE, gpios);
 
-	const struct device *dev = (struct device *) arg1;
-
-  //Sets up addresses to queue messages
-	struct k_msgq *dvl_msgq = (struct k_msgq *) arg2;
-
-	struct dvl_sample dvl_sample;
-
-	while (1) {
-    //Draw samples from dvl
-		int dvl_ret = sample_imu(dev, &dvl_sample);
-		if (dvl_ret != 0) {
-			LOG_ERR("Error sampling DVL: %d", dvl_ret);
-		}
-
-		while (k_msgq_put(dvl_msgq, &dvl_sample, K_NO_WAIT) != 0) {
-			LOG_ERR("Dropping DVL samples");
-			k_msgq_purge(dvl_msgq);
-		}
-
-		k_sleep(K_MSEC(1)); /* 1Khz poll rate */
+	if (dev == NULL) {
+		/* No such node, or the node does not have status "okay". */
+		printk("\nError: no device found.\n");
+		return NULL;
 	}
+
+	if (!device_is_ready(dev)) {
+		printk("\nError: DVL \"%s\" is not ready; "
+		       "check the driver initialization logs for errors.\n",
+		       dev->name);
+		return NULL;
+	}
+
+	printk("Found DVL \"%s\", getting sensor data\n", dev->name);
+	return dev;
 }
+
 #endif /* DVL_POLL_THREAD */

@@ -77,85 +77,81 @@ void main(void)
 	}
 
 	att_controller_init(&attitude_controller);
-    angvel_controller_init(&angular_velocity_controller);
-    position_controller_init(&pos_controller);
-    velocity_controller_init(&vel_controller);
-    mec_vehicle_position_init(&position);
+  angvel_controller_init(&angular_velocity_controller);
+  position_controller_init(&pos_controller);
+  velocity_controller_init(&vel_controller);
+  mec_vehicle_position_init(&position);
 
-    pos_controller.use_floor_depth = false;
+  pos_controller.use_floor_depth = false;
 
-    att_sp.roll = 0;
-    att_sp.pitch = 0;
-    att_sp.yaw = 45 * D2R;
-    att_controller_update_sp(&attitude_controller, &att_sp);
+  att_sp.roll = 0;
+  att_sp.pitch = 0;
+  att_sp.yaw = 45 * D2R;
+  att_controller_update_sp(&attitude_controller, &att_sp);
 
-    position_sp.down = 2;
-    position_controller_update_sp(&pos_controller, &position_sp);
+  position_sp.down = 2;
+  position_controller_update_sp(&pos_controller, &position_sp);
 
-    // Control the simulated sub's thrusters.
-    std::cout << "Thrusters initialized!" << std::endl;
-    auto mtime = std::chrono::steady_clock::now();
+  // Control the simulated sub's thrusters.
+  std::cout << "Thrusters initialized!" << std::endl;
+  auto mtime = std::chrono::steady_clock::now();
 
 	while (rclcpp::ok())
 	{
 		rclcpp::spin_some(node);
-        auto t = std::chrono::steady_clock::now();
-        float dt = ((t - mtime) / 1us) / 1000000.;
-        mtime = t;
-        mec_vehicle_position_update(&velocity_body,
-                vehicle_depth, &position, &attitude, dt);
-        if (!angvel_override)
-        {
-            att_controller_update(
-                    &attitude_controller,
-                    &attitude,
-                    &angvel_sp,
-                    dt
-                    );
-            angvel_controller_update_sp(
-                    &angular_velocity_controller,
-                    &angvel_sp
-                    );
-        }
-        angvel_controller_update(
+    auto t = std::chrono::steady_clock::now();
+    float dt = ((t - mtime) / 1us) / 1000000.;
+    mtime = t;
+
+		mec_vehicle_position_update(&velocity_body,
+    														vehicle_depth, &position, &attitude, dt);
+    if (!angvel_override)
+    {
+        att_controller_update(
+                &attitude_controller,
+                &attitude,
+                &angvel_sp,
+                dt
+                );
+        angvel_controller_update_sp(
                 &angular_velocity_controller,
-                &angvel,
-                &torque_out,
+                &angvel_sp
+                );
+    }
+    angvel_controller_update(
+            &angular_velocity_controller,
+            &angvel,
+            &torque_out,
+            dt
+            );
+
+    if (!velocity_override)
+    {
+        position_controller_update(
+                &pos_controller,
+                &position,
+                &velocity_sp,
                 dt
                 );
-
-        if (!velocity_override)
-        {
-            position_controller_update(
-                    &pos_controller,
-                    &position,
-                    &velocity_sp,
-                    dt
-                    );
-            velocity_ned_to_body(
-                    &velocity_body_sp,
-                    &velocity_sp,
-                    &attitude
-                    );
-            velocity_controller_update_sp(
-                    &vel_controller,
-                    &velocity_body_sp
-                    );
-        }
-        velocity_controller_update(
+        velocity_ned_to_body(
+                &velocity_body_sp,
+                &velocity_sp,
+                &attitude
+                );
+        velocity_controller_update_sp(
                 &vel_controller,
-                &velocity_body,
-                &force_out,
-                dt
+                &velocity_body_sp
                 );
+    }
+    velocity_controller_update(
+            &vel_controller,
+            &velocity_body,
+            &force_out,
+            dt
+            );
 
-        //std::cout << "pos " << position.north << " " << position.east << " " << position.depth << std::endl;
-        //std::cout << "vel " << velocity_body.forward_m_s << " " << velocity_body.right_m_s << " " << velocity_body.down_m_s << std::endl;
-        //std::cout << "att " << attitude.roll << " " << attitude.pitch << " " << attitude.yaw << std::endl;
-        //std::cout << "angvel " << angvel.roll_rad_s << " " << angvel.pitch_rad_s << " " << angvel.yaw_rad_s << std::endl;
-
-        //Copied from main.cpp in nautical, changed slightly to accomodate maritime reporting
-        if (Serial.available() > 0)
+    //Copied from main.cpp in nautical, changed slightly to accomodate maritime reporting
+    if (Serial.available() > 0)
 		{
 			char c = Serial.read();
 			if (c == 'a')
@@ -171,11 +167,12 @@ void main(void)
 				Serial << velocity_body.forward_m_s << " " << velocity_body.right_m_s << " " << " " << velocity_body.down_m_s << '\n';
 			}
 
-        float thruster_outputs[8];
-        mec_mix(&force_out, &torque_out, mix, thruster_outputs);
+		  float thruster_outputs[8];
+		  mec_mix(&force_out, &torque_out, mix, thruster_outputs);
 
 		//printf("Toggling!\n");
 		//gpio_pin_toggle(gpio_port_dev, LED_PIN);
 		k_msleep(1000);
+		}
 	}
 }

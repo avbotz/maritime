@@ -11,6 +11,51 @@
 #include <thruster.h>
 #include <pressure_sensor.h>
 
+#include <rclcpp/rclcpp.hpp>
+#include <chrono>
+#include <thread>
+
+#include <sensor_msgs/msg/imu.hpp>
+#include <sensor_msgs/msg/fluid_pressure.hpp>
+#include <uuv_sensor_ros_plugins_msgs/msg/dvl.hpp>
+#include <uuv_gazebo_ros_plugins_msgs/msg/float_stamped.hpp>
+
+#include "simulator/commandParser.hpp"
+#include "simulator/utils.hpp"
+#include "mec/control.h"
+#include "mec/estimation.h"
+#include "mec/util.h"
+
+using namespace std::chrono_literals;
+using namespace std::literals;
+
+bool velocity_override = false;
+bool angvel_override = false;
+Matrix<float, 6, 8> mix(nemo_mix_data);
+struct att_controller attitude_controller;
+struct angvel_controller angular_velocity_controller;
+struct position_controller pos_controller;
+struct velocity_controller vel_controller;
+
+struct mec_torque_setpoint torque_out;
+struct mec_force_setpoint force_out;
+
+struct mec_vehicle_position position;
+
+struct mec_vehicle_velocity_body velocity_body;
+
+float vehicle_depth = 0;
+
+struct mec_vehicle_attitude att_sp;
+struct mec_vehicle_attitude attitude;
+struct mec_vehicle_angvel angvel;
+struct mec_vehicle_angvel angvel_sp;
+struct mec_vehicle_velocity velocity_sp;
+struct mec_vehicle_velocity_body velocity_body_sp;
+struct mec_vehicle_position position_sp;
+float last_pressure_update_time;
+float last_pressure_depth = -999;
+
 /* change this to any other UART peripheral if desired */
 #define UART_DEVICE_NODE DT_CHOSEN(zephyr_shell_uart)
 
@@ -20,6 +65,9 @@
 K_MSGQ_DEFINE(uart_msgq, MSG_SIZE, 10, 4);
 
 static const struct device *const uart_dev = DEVICE_DT_GET(UART_DEVICE_NODE);
+static const struct device *const dvl = get_DVL_device();
+static const struct device *const mag = get_rm3100_device();
+static const struct device *const imu = get_icm20689_device();
 
 /* receive buffer used in UART ISR callback */
 static char rx_buf[MSG_SIZE];
@@ -62,7 +110,7 @@ void serial_cb(const struct device *dev, void *user_data)
  */
 void print_uart(char *buf)
 {
-	int msg_len = strlen(buf);
+  int msg_len = strlen(buf);
 
 	for (int i = 0; i < msg_len; i++) {
 		uart_poll_out(uart_dev, buf[i]);
@@ -94,7 +142,28 @@ void main(void)
 	//print_uart("Tell me something and press enter:\r\n");
 
   struct ahrs_sample ahrs_sample;
-  struct dvl_sample dvl_sample;
+  struct imu_sample imu_sample;
+	struct mag_sample mag_sample;
+
+	att_controller_init(&attitude_controller);
+  angvel_controller_init(&angular_velocity_controller);
+  position_controller_init(&pos_controller);
+  velocity_controller_init(&vel_controller);
+  mec_vehicle_position_init(&position);
+
+  pos_controller.use_floor_depth = false;
+
+  att_sp.roll = 0;
+  att_sp.pitch = 0;
+  att_sp.yaw = 45 * D2R;
+  att_controller_update_sp(&attitude_controller, &att_sp);
+
+  position_sp.down = 2;
+  position_controller_update_sp(&pos_controller, &position_sp);
+
+  // Control the simulated sub's thrusters.
+  std::cout << "Thrusters initialized!" << std::endl;
+  auto mtime = std::chrono::steady_clock::now();
 
 	/* indefinitely wait for input from the user */
 	while (k_msgq_get(&uart_msgq, &tx_buf, K_FOREVER) == 0) {
@@ -110,23 +179,94 @@ void main(void)
   		LOG_ERR("Error sampling DVL: %d", dvl_ret);
   	}
 
+		rclcpp::spin_some(node);
+    auto t = std::chrono::steady_clock::now();
+    float dt = ((t - mtime) / 1us) / 1000000.;
+    mtime = t;
+
+		mec_vehicle_position_update(&velocity_body,
+    														vehicle_depth, &position, &attitude, dt);
+    if (!angvel_override)
+    {
+        att_controller_update(
+                &attitude_controller,
+                &attitude,
+                &angvel_sp,
+                dt
+                );
+        angvel_controller_update_sp(
+                &angular_velocity_controller,
+                &angvel_sp
+                );
+    }
+    angvel_controller_update(
+            &angular_velocity_controller,
+            &angvel,
+            &torque_out,
+            dt
+            );
+
+    if (!velocity_override)
+    {
+        position_controller_update(
+                &pos_controller,
+                &position,
+                &velocity_sp,
+                dt
+                );
+        velocity_ned_to_body(
+                &velocity_body_sp,
+                &velocity_sp,
+                &attitude
+                );
+        velocity_controller_update_sp(
+                &vel_controller,
+                &velocity_body_sp
+                );
+    }
+    velocity_controller_update(
+            &vel_controller,
+            &velocity_body,
+            &force_out,
+            dt
+            );
+
     if(tx_buf == 'a'){
       //Print attitude over uart
-      print_double_over_uart(ahrs_sample->rotation);
-      print_uart('\n');
-      print_uart();
-    } else if(tx_buf == 'b'){
-      //Print angular velocity over uart
-      print_double_over_uart(ahrs_sample->gyro[0]);
+			print_double_over_uart(ahrs_sample->gyro[0]);
       print_uart(' ');
       print_double_over_uart(ahrs_sample->gyro[1]);
       print_uart(' ');
       print_double_over_uart(ahrs_sample->gyro[2]);
       print_uart('\n');
+    } else if(tx_buf == 'b'){
+      //Print angular velocity over uart
+			print_double_over_uart(velocity_body.forward_m_s);
+      print_uart(' ');
+      print_double_over_uart(velocity_body.right_m_s);
+      print_uart(' ');
+      print_double_over_uart(velocity_body.down_m_s);
+      print_uart('\n');
     } else if(tx_buf == 'd'){
+			print_double_over_uart(pos_controller.use_floor_depth);
+      print_uart('\n);
       //Print depth mode over uart
     } else if (tx_buf == 'p'){
-      //Print position over uart
+      //Print current position over uart
+			print_double_over_uart(pos.north);
+      print_uart(' ');
+      print_double_over_uart(pos.east);
+      print_uart(' ');
+      print_double_over_uart(pos.down);
+      print_uart('\n');
+    } else if (tx_buf == 'x'){
+      //Print desired position over uart
+			print_double_over_uart(pos_controller.north);
+      print_uart(' ');
+      print_double_over_uart(pos_controller.east);
+      print_uart(' ');
+      print_double_over_uart(pos_controller.down);
+      print_uart('\n');
     } else if (tx_buf == 'v'){
       //Print linear velocity over uart
       print_double_over_uart(dvl_sample->changeX);
