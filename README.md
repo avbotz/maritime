@@ -1,7 +1,28 @@
 # Maritime
 Welcome to maritime! This is the new, experimental low level control stack
 for the AVBotz submarine, Nemo. Once completed, it will replace Nautical in
-driving the sub.
+driving the sub. Connect PC to nucleo f767zi microcontroller via usb to begin.
+
+## Install
+
+In a terminal, enter the following commands:
+```sh
+git clone --recurse-submodules https://github.com/avbotz/maritime.git
+cd maritime
+./install.sh
+```
+
+## Compiling
+
+```sh
+west build -b nucleo_f767zi (local compile)
+west flash (flashes microcontroller)
+sudo ./comms.sh && sudo chmod 666 /dev/ttyACM* (init serial communication)
+```
+
+## Startup
+
+After building and flashing, run tmux in a terminal. Split the tmux window into two panes. Run "cat < /dev/ttyACM*" in one and "cat > /dev/ttyACM*" in the other. The former pane is the DISPLAY pane, it will show the output from maritime. The latter is the COMMAND pane, it is where maritime receives its input.
 
 ## What's the name?
 ![why-maritime-name](docs/why-maritime-name.png)
