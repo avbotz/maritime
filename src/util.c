@@ -1,7 +1,11 @@
 /*
  * Various helper functions to help do stuff
  */
+#include <stdio.h>
+#include <math.h>
 #include "util.h"
+
+#define PI 3.141592653
 
 
 /* 
@@ -29,10 +33,10 @@ float parse_float(char *ptr, char *delim)
  */
 float rad_to_deg(float rad)
 {
-    return rad / M_PI * 180.;
+    return rad / PI * 180.;
 }
 
 float deg_to_rad(float deg)
 {
-    return deg / 180. * M_PI;
+    return deg / 180. * PI;
 }

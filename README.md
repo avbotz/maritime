@@ -15,7 +15,7 @@ cd maritime
 ## Compiling
 
 ```sh
-west build -b nucleo_f767zi (local compile)
+./compile.sh (local compile)
 west flash (flashes microcontroller)
 sudo ./comms.sh && sudo chmod 666 /dev/ttyACM* (init serial communication)
 ```

@@ -1,0 +1,1 @@
+west build -b nucleo_f767zi

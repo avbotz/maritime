@@ -1,43 +1,48 @@
-/ {
-  &usart6 {
-    k1 : ashcroft_pressure_sensor {
-      compatible = "ashcroft,k1";
-      gpios = <&gpioc 15 GPIO_ACTIVE_LOW>;
-      label = "Ashcroft Model K1 Pressure Transducer/Transmitter";
-    };
-
-    icm20689 : ahrs_imu {
-      compatible = "invensense,icm20689";
-      gpios = <&gpioc 16 GPIO_ACTIVE_LOW>;
-      label = "ICM20689 MEMS accelerometer & gyroscope";
-    };
-
-    rm3100 : ahrs_mag {
-      compatible = "witmotion,rm3100";
-      gpios = <&gpioc 17 GPIO_ACTIVE_LOW>;
-      label = "RM3100 magnetometer";
-    };
-
-    a50 : doppler_velocity_log {
-      compatible = "waterlinked,a50";
-      gpios = <&gpioc 18 GPIO_ACTIVE_LOW>;
-      label = "Water Linked DVL A50";
-    };
-
-    ks : killswitch {
-      compatible = "avbotz, ks";
-      gpios = <&gpioc 31 GPIO_ACTIVE_LOW>;
-      label = "AVBotz Killswitch";
-    };
-
-  };
-
-
-  aliases {
-    pressure_sensor = &k1;
-    imu = &icm20689;
-    mag = &rm3100;
-    dvl = &a50;
-    ks  = &ks;
-  };
+/* Communicate with DVL via uart */
+&uart5 {
+    pinctrl-0 = <&uart5_tx_pb9 &uart5_rx_pb8>;
+    pinctrl-names = "default";
+    current-speed = <115200>;
+    status = "okay";
 };
+
+/* Communicate with pressure sensor via i2c */
+&i2c1 {
+    status = "disabled";
+};
+
+&i2c2 {
+    pinctrl-0 = <&i2c2_scl_pb10 &i2c2_sda_pb11>;
+    pinctrl-names = "default";
+    status = "okay";
+    clock-frequency = <I2C_BITRATE_STANDARD>;
+    ms5837@76 {
+        compatible = "meas,ms5837";
+        reg = <0x76>;
+    };
+};
+
+/* Communicate with servos via PWM */
+&pwm1 {
+    status = "okay";
+};
+
+&pwm2 {
+    status = "okay";
+};
+
+&pwm3 {
+    status = "okay";
+};
+
+/* Communicate with thrusters via CAN */
+/*
+can1 already enabled, alias zephyr,canbus = &can1;
+
+&can1 {
+    pinctrl-0 = <&can1_rx_pd0 &can1_tx_pd1>;
+    pinctrl-names = "default";
+    bus-speed = <125000>;
+    status = "okay";
+};
+*/
