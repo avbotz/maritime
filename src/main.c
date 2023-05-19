@@ -3,27 +3,29 @@
  * Receives setpoint destinations from pc/jetson and can send 
  * back state (location) info to the pc/jetson when requested.
  */
-#include <zephyr.h>
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/uart.h>
 #include <zephyr/sys_clock.h>
-#include <drivers/gpio.h>
+#include <zephyr/drivers/gpio.h>
+#include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <math.h>
 
-#include "ahrs.h"
-#include "dvl.h"
-#include "thruster.h"
-#include "pressure_sensor.h"
-#include "util.h"
+#include "maritime/dvl.h"
+#include "maritime/ahrs.h"
+#include "maritime/pressure.h"
+#include "maritime/thrusters.h"
+#include "maritime/servos.h"
+#include "maritime/killswitch.h"
+#include "maritime/util.h"
 
 #include "mec/control.h"
 #include "mec/estimation.h"
+#include "mec/pid_controller.h"
 #include "mec/util.h"
-
 
 /* change this to any other UART peripheral if desired */
 #define UART_DEVICE_NODE DT_CHOSEN(zephyr_shell_uart)
@@ -35,10 +37,6 @@
 K_MSGQ_DEFINE(uart_msgq, MSG_SIZE, 10, 4);
 
 static const struct device *const uart_dev = DEVICE_DT_GET(UART_DEVICE_NODE);
-static const struct device *const dvl = get_DVL_device();
-static const struct device *const mag = get_rm3100_device();
-static const struct device *const imu = get_icm20689_device();
-static const struct device *const ks = get_KILLSWITCH_device();
 
 /* receive buffer used in UART ISR callback */
 static char rx_buf[MSG_SIZE];
@@ -88,16 +86,7 @@ void print_uart(char *buf)
     }
 }
 
-bool alive()
-{
-    // Todo: read the kill switch pin to return if we are alive or not
-    uint8_t killswitch_pin = DT_GPIO_PIN(DT_NODELABEL(ks), gpios);
-    uint8_t current_state = gpio_pin_get(ks, killswitch_pin);
-    // SUB is ALIVE when state is 1
-    return current_state == 1;
-}
-
-void main(void)
+int main(void)
 {
     // Initialize a bunch of variables
     bool alive_state = alive();
@@ -111,7 +100,6 @@ void main(void)
     float power = 0;
     float INITIAL_YAW;
 
-    Matrix<float, 6, 8> mix(nemo_mix_data);
     struct att_controller attitude_controller;
     struct angvel_controller angular_velocity_controller;
     struct position_controller pos_controller;
@@ -149,35 +137,30 @@ void main(void)
     char msg[MSG_SIZE];
     char delim[] = " ";
 
-    if (!device_is_ready(uart_dev)) {
-        printk("UART device not found!");
-        return;
-    }
+    // if (!device_is_ready(uart_dev)) {
+    //     printk("UART device not found!");
+    //     return;
+    // }
 
     /* configure interrupt and callback to receive data */
     uart_irq_callback_user_data_set(uart_dev, serial_cb, NULL);
     uart_irq_rx_enable(uart_dev);
 
-    struct ahrs_sample ahrs_sample;
-    struct imu_sample imu_sample;
-    struct mag_sample mag_sample;
+    // Initialize sensor communications
+    init_dvl();
+    init_pressure();
+    init_servos();
+    init_killswitch();
+    // todo: init_ahrs(); init_thrusters();
 
     // TODO: here, set INITIAL_YAW = the initial ahrs yaw we sample
 
     // Begin motor control loop
     while (true)
     {
-        // TODO: finish dvl interfacing and sample dvl here
-        int dvl_ret = sample_dvl(dev, &dvl_sample);
-        if (dvl_ret != 0) {
-            LOG_ERR("Error sampling DVL: %d", dvl_ret);
-        }
-        // TODO: update velocity_body with that fresh dvl data
-        /*
-        velocity_body.forward_m_s = newest_dvl_forward_m_s
-        velocity_body.right_m_s = newest_dvl_right_m_s
-        velocity_body.down_m_s = newest_dvl_down_m_s
-        */
+        velocity_body.forward_m_s = dvl_get_velocity_x();
+        velocity_body.right_m_s = dvl_get_velocity_y();
+        velocity_body.down_m_s = dvl_get_velocity_z();
 
         // Parse message coming from computer if there is one
         if (k_msgq_get(&uart_msgq, &msg, K_NO_WAIT) == 0)
@@ -328,12 +311,21 @@ void main(void)
                 position_sp.east += absolute_offsets[1];
                 position_sp.down += absolute_offsets[2];
 
-                att_sp.yaw = angle_add(attitude.yaw, this->Serial.parseFloat() * D2R);
-                att_sp.pitch = angle_add(attitude.pitch, this->Serial.parseFloat() * D2R);
-                att_sp.roll = angle_add(attitude.roll, this->Serial.parseFloat() * D2R);
+                att_sp.yaw = angle_add(attitude.yaw, 
+                    deg_to_rad(parse_float(ptr, delim)));
+                att_sp.pitch = angle_add(attitude.pitch, 
+                    deg_to_rad(parse_float(ptr, delim)));
+                att_sp.roll = angle_add(attitude.roll, 
+                    deg_to_rad(parse_float(ptr, delim)));
 
                 position_controller_update_sp(&pos_controller, &position_sp);
                 att_controller_update_sp(&attitude_controller, &att_sp);
+            }
+            else if (c == 'h')
+            {
+                // Todo: implement ahrs sampling
+                // snprintf(output, sizeof(output), "%f\n", ahrs_get_yaw());
+                print_uart(output);
             }
             else if (c == 'x')
             {
@@ -354,8 +346,7 @@ void main(void)
             {
                 int idx = parse_int(ptr, delim);
                 int val = parse_int(ptr, delim);
-                // TODO: interface with ball dropper
-                // this->drop(idx, val);
+                drop(idx, val);
             }
             else if (c == 'u')
             {
@@ -390,15 +381,13 @@ void main(void)
             else if (c == 'f')
             {
                 int val = parse_int(ptr, delim);
-                // TODO: interface with grabber
-                // this->grab(val);
+                grab(val);
             }
             else if (c == 'o')
             {
                 int idx = parse_int(ptr, delim);
                 int val = parse_int(ptr, delim);
-                // TODO: interface with torp shooter
-                // this->shoot(idx, val);
+                shoot(idx, val);
             }
         }
 
@@ -453,28 +442,18 @@ void main(void)
         // intended.
         if (!pause && alive_state)
         {
-            // TODO: interface with the pressure sensor, ahrs, dvl to 
-            // get the latest sensor readings
-            /*
-            position.down = get_depth_from_pressure_sensor()
+            position.down = pressure_get_depth();
 
-            //Sample IMU on AHRS
-            int imu_ret = sample_imu(dev, &ahrs_sample);
-            if (imu_ret != 0) {
-                LOG_ERR("Error sampling IMU: %d", imu_ret);
+            // Todo: implement ahrs sampling here
 
-            // TODO: do (current yaw/pitch/roll - previous yaw/pitch/roll) / dt
-            // inside of ahrs interfacing implementation to get the angular
-            // velocity
-            angvel.roll_rad_s = ahrs_get_roll_rad_s
-            angvel.pitch_rad_s = ahrs_get_pitch_rad_s
-            angvel.yaw_rad_s = ahrs_get_yaw_rad_s
+            // angvel.roll_rad_s = ahrs_get_roll_rad_s()
+            // angvel.pitch_rad_s = ahrs_get_pitch_rad_s()
+            // angvel.yaw_rad_s = ahrs_get_yaw_rad_s()
 
-            attitude.yaw = ahrs_get_yaw() - INITIAL_YAW
-            attitude.pitch = ahrs_get_pitch()
-            attitude.roll = ahrs_get_roll()
-            position.altitude = dvl_get_range_to_bottom()
-            */
+            // attitude.yaw = ahrs_get_yaw() - INITIAL_YAW
+            // attitude.pitch = ahrs_get_pitch()
+            // attitude.roll = ahrs_get_roll()
+            // position.altitude = dvl_get_altitude()
           
             // Handle angle overflow/underflow.
             attitude.yaw += (attitude.yaw > M_PI) ? -2*M_PI : (attitude.yaw < -M_PI) ? 2*M_PI : 0;
@@ -483,7 +462,7 @@ void main(void)
 
             // Update our position based on velocity and time elapsed
             uint32_t t = k_uptime_get_32();
-            float dt = (t - this->motor_time) / 1000.;
+            float dt = (t - motor_time) / 1000.;
             motor_time = t;
 
             mec_vehicle_position_update(&velocity_body,
@@ -533,7 +512,7 @@ void main(void)
 
             // Map forces and torques to thruster outputs
             float thruster_outputs[8];
-            mec_mix(&force_out, &torque_out, mix, power, thruster_outputs);
+            mec_mix(&force_out, &torque_out, sub_mix_data, power, thruster_outputs);
 
             // TODO: interface with thrusters to send them the thruster_outputs
             // send_thrusts(thruster_outputs) // for example
