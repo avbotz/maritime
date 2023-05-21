@@ -23,21 +23,19 @@
       gpios = <&gpioc 18 GPIO_ACTIVE_LOW>;
       label = "Water Linked DVL A50";
     };
-
-    ks : killswitch {
-      compatible = "avbotz, ks";
-      gpios = <&gpioc 31 GPIO_ACTIVE_LOW>;
-      label = "AVBotz Killswitch";
-    };
-
   };
 
+    AVBOTZks : killswitch {
+        compatible = "AVBOTZ, AVBOTZks";
+        gpios = <&gpio0 31 GPIO_ACTIVE_HIGH>;
+        label = "AVBOTZ killswitch"
+    };
 
   aliases {
     pressure_sensor = &k1;
     imu = &icm20689;
     mag = &rm3100;
     dvl = &a50;
-    ks  = &ks;
+    ks  = &AVBOTZks;
   };
 };
