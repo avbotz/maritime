@@ -1,22 +1,16 @@
 #include <zephyr/kernel.h>
-#include <zephyr/sys/printk.h>
 #include <zephyr/device.h>
-#include <zephyr/drivers/pwm.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/sys/printk.h>
+#include <inttypes.h>
 
-#define KILLSWITCH_NODE DT_NODELABEL(ks)
-#define KILLSWITCH_GPIO DT_GPIO_LABEL(KILLSWITCH_NODE, gpios)
-
-static const struct device *get_KILLSWITCH_device(void) {
-    
-    const struct device *const dev = device_get_binding(KILLSWITCH_GPIO);
-    return dev;
-}
+static const struct gpio_dt_spec killswitch = 
+    GPIO_DT_SPEC_GET(DT_NODELABEL(killswitch_button), gpios);
 
 bool alive()
 {
-    // Todo: read the kill switch pin to return if we are alive or not
-    uint8_t killswitch_pin = DT_GPIO_PIN(DT_NODELABEL(ks), gpios);
-    uint8_t current_state = gpio_pin_get(ks, killswitch_pin);
+    uint8_t current_state = gpio_pin_get_dt(&killswitch);
     // SUB is ALIVE when state is 1
     return current_state == 1;
 }

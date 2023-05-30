@@ -38,10 +38,6 @@ extern "C"
 K_MSGQ_DEFINE(uart_msgq, MSG_SIZE, 10, 4);
 
 static const struct device *const uart_dev = DEVICE_DT_GET(UART_DEVICE_NODE);
-static const struct device *const dvl = get_DVL_device();
-static const struct device *const mag = get_rm3100_device();
-static const struct device *const imu = get_icm20689_device();
-static const struct device *const ks = get_KILLSWITCH_device();
 
 /* receive buffer used in UART ISR callback */
 static char rx_buf[MSG_SIZE];
@@ -91,7 +87,7 @@ void print_uart(char *buf)
     }
 }
 
-void main(void)
+int main(void)
 {
     // Initialize a bunch of variables
     bool alive_state = alive();
@@ -152,13 +148,10 @@ void main(void)
     uart_irq_callback_user_data_set(uart_dev, serial_cb, NULL);
     uart_irq_rx_enable(uart_dev);
 
-    struct ahrs_sample ahrs_sample;
-    struct imu_sample imu_sample;
-    struct mag_sample mag_sample;
-
     // Initialize sensor communications
     init_dvl();
     init_pressure();
+    init_servos();
 
     // TODO: here, set INITIAL_YAW = the initial ahrs yaw we sample
 

@@ -51,6 +51,47 @@ int ring_buf_get_byte(struct ring_buf *buf, uint8_t *byte) {
 }
 */
 
+void uart_irq_callback(const struct device *dev, void *data) 
+{	
+    ARG_UNUSED(dev);
+    ARG_UNUSED(data);
+
+
+    while (uart_irq_update(uart_device) && uart_irq_is_pending(uart_device)) {
+
+        if (uart_irq_tx_complete(uart_device) && ring_buf_is_empty(&ring_buf_tx)){
+            uart_irq_tx_disable(uart_device);
+        }
+
+        uint8_t tx_byte;
+        if (uart_irq_tx_ready(uart_device)){
+            ring_buf_get(&ring_buf_tx, &tx_byte, 1);
+            uart_fifo_fill(uart_device, &tx_byte, 1);
+        }
+
+        uint8_t rx_byte;
+        if (uart_irq_rx_ready(uart_device)) {
+            uart_fifo_read(uart_device, &rx_byte, 1);
+            ring_buf_put(&ring_buf_rx, &rx_byte, 1);
+
+            if (rx_byte == 'w') {
+                if (seen_start) {
+                    printk("See new start byte without previous end byte");
+                }
+                seen_start = true;
+            }
+            if ((rx_byte == '\n' || rx_byte == '\r') && seen_start) {
+                seen_start = false;
+                process_frame();   
+            } 
+
+            // echo back byte
+            // ring_buf_put(&ring_buf_tx, &rx_byte, 1);
+            // uart_irq_tx_enable(uart_device);
+        }
+    }
+}
+
 void init_dvl() 
 {
     // uart_tx_msg("HELLO WORLD");
@@ -193,47 +234,4 @@ void uart_tx_msg(char *msg)
 {
     ring_buf_put(&ring_buf_tx, msg, strlen(msg));
     uart_irq_tx_enable(uart_device);
-}
-
-
-void uart_irq_callback(const struct device *dev, void *data) 
-{
-    ARG_UNUSED(dev);
-    ARG_UNUSED(data);
-
-
-    while (uart_irq_update(uart_device) && uart_irq_is_pending(uart_device)) {
-
-        if (uart_irq_tx_complete(uart_device) && ring_buf_is_empty(&ring_buf_tx)){
-            uart_irq_tx_disable(uart_device);
-        }
-
-        uint8_t tx_byte;
-        if (uart_irq_tx_ready(uart_device)){
-            ring_buf_get(&ring_buf_tx, &tx_byte, 1);
-            uart_fifo_fill(uart_device, &tx_byte, 1);
-        }
-
-        uint8_t rx_byte;
-        if (uart_irq_rx_ready(uart_device)) {
-            uart_fifo_read(uart_device, &rx_byte, 1);
-            ring_buf_put(&ring_buf_rx, &rx_byte, 1);
-
-            if (rx_byte == 'w') {
-                if (seen_start) {
-                    printk("See new start byte without previous end byte");
-                }
-                seen_start = true;
-            }
-            if ((rx_byte == '\n' || rx_byte == '\r') && seen_start) {
-                seen_start = false;
-                process_frame();   
-            } 
-
-            // echo back byte
-            // ring_buf_put(&ring_buf_tx, &rx_byte, 1);
-            // uart_irq_tx_enable(uart_device);
-        }
-    }
-
 }
