@@ -10,7 +10,7 @@
 LOG_MODULE_REGISTER(main);
 
 struct sensor_value oversampling_rate = { 8192, 0 };
-const struct device *const dev = DEVICE_DT_GET_ANY(meas_ms5837);
+static const struct device *const dev = DEVICE_DT_GET_ANY(meas_ms5837);
 
 void init_pressure()
 {

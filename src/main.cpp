@@ -18,7 +18,7 @@
 #include "killswitch.c"
 #include "pressure.h"
 #include "servos.h"
-#include "thruster.h"
+#include "thrusters.h"
 #include "util.h"
 
 #include "mec/control.h"
@@ -38,10 +38,6 @@ extern "C"
 K_MSGQ_DEFINE(uart_msgq, MSG_SIZE, 10, 4);
 
 static const struct device *const uart_dev = DEVICE_DT_GET(UART_DEVICE_NODE);
-static const struct device *const dvl = get_DVL_device();
-static const struct device *const mag = get_rm3100_device();
-static const struct device *const imu = get_icm20689_device();
-static const struct device *const ks = get_KILLSWITCH_device();
 
 /* receive buffer used in UART ISR callback */
 static char rx_buf[MSG_SIZE];
@@ -159,6 +155,7 @@ void main(void)
     // Initialize sensor communications
     init_dvl();
     init_pressure();
+    init_servos();
 
     // TODO: here, set INITIAL_YAW = the initial ahrs yaw we sample
 
@@ -411,6 +408,8 @@ void main(void)
         {
             // TODO: send thrust values of 0 here in case 
             // the power doesn't shut off?
+            float thrusts[] = {0, 0, 0, 0, 0, 0, 0, 0};
+            send_thrusts(thrusts);
         }
 
         // Kill switch has just been switched from dead to alive. Reset all
@@ -522,8 +521,8 @@ void main(void)
             float thruster_outputs[8];
             mec_mix(&force_out, &torque_out, mix, power, thruster_outputs);
 
-            // TODO: interface with thrusters to send them the thruster_outputs
-            // send_thrusts(thruster_outputs) // for example
+            // Update thrusts on each thruster
+            send_thrusts(thruster_outputs) 
         }
     }
 }
