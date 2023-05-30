@@ -3,7 +3,7 @@
  */
 #include <stdio.h>
 #include <math.h>
-#include "util.h"
+#include "maritime/util.h"
 
 #define PI 3.141592653
 

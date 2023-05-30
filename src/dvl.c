@@ -13,6 +13,8 @@
 #include <zephyr/sys/ring_buffer.h>
 #include <zephyr/logging/log.h>
 
+#include "maritime/dvl.h"
+
 
 LOG_MODULE_REGISTER(uart_dvl, LOG_LEVEL_INF);
 

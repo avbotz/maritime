@@ -1,5 +1,5 @@
-#ifndef DVL_H
-#define DVL_H
+#ifndef _MARITIME_DVL_H
+#define _MARITIME_DVL_H
 
 void init_dvl();
 float dvl_get_velocity_x();

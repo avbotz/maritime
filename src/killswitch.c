@@ -8,6 +8,11 @@
 static const struct gpio_dt_spec killswitch = 
     GPIO_DT_SPEC_GET(DT_NODELABEL(killswitch_button), gpios);
 
+void init_killswitch()
+{
+    
+}
+
 bool alive()
 {
     uint8_t current_state = gpio_pin_get_dt(&killswitch);

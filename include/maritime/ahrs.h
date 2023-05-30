@@ -1,3 +1,6 @@
+#ifndef _MARITIME_AHRS_H
+#define _MARITIME_AHRS_H
+
 // #include <zephyr.h>
 // #include <device.h>
 
@@ -25,4 +28,4 @@
 // void init_mag(struct k_msgq *mag_msgq, struct k_msgq *attitude_msgq);
 // int process_mag(const struct device *dev, struct mag_sample *mag_sample);
 
-// #endif /* AHRS_H */
+#endif /* _MARITIME_AHRS_H */
