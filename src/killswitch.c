@@ -10,7 +10,7 @@ static const struct gpio_dt_spec killswitch =
 
 void init_killswitch()
 {
-    
+    gpio_pin_configure_dt(&killswitch, GPIO_INPUT);
 }
 
 bool alive()

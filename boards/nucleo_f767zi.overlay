@@ -1,3 +1,5 @@
+/* Ask chatgpt if u don't understand some of this stuff */
+
 /* 
  * Communicate with the servos (that control dropper, grabber, shooter) 
  * via pwm 

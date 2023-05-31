@@ -16,15 +16,6 @@ target_include_directories(app PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-#file(GLOB MEC_SOURCES extern/maritime_ec/src/*.cpp)
-#add_library(maritime_ec
- #   ${MEC_SOURCES}
-#)
-#target_include_directories(maritime_ec PUBLIC
-#    ${CMAKE_CURRENT_SOURCE_DIR}/extern/maritime_ec/include
-#)
-#target_link_libraries(app PRIVATE maritime_ec)
-
 add_subdirectory(extern/maritime_ec)
+include_directories(extern/maritime_ec/include)
 target_link_libraries(app PRIVATE maritime_ec)
-#include_directories(extern/maritime_ec/include)
