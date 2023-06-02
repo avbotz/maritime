@@ -100,6 +100,8 @@ int main(void)
     float power = 0;
     float INITIAL_YAW;
 
+    float mix[8][6];
+    memcpy(mix, sub_mix_data, sizeof(float) * NUM_THRUSTERS * NUM_DOF);
     struct att_controller attitude_controller;
     struct angvel_controller angular_velocity_controller;
     struct position_controller pos_controller;
@@ -512,7 +514,7 @@ int main(void)
 
             // Map forces and torques to thruster outputs
             float thruster_outputs[8];
-            mec_mix(&force_out, &torque_out, sub_mix_data, power, thruster_outputs);
+            mec_mix(&force_out, &torque_out, mix, power, thruster_outputs);
 
             // TODO: interface with thrusters to send them the thruster_outputs
             // send_thrusts(thruster_outputs) // for example
