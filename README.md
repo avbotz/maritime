@@ -24,6 +24,27 @@ west flash   (flashes microcontroller)
 
 After building and flashing, run tmux in a terminal. Split the tmux window into two panes. Run "cat < /dev/ttyACM*" in one and "cat > /dev/ttyACM*" in the other. The former pane is the DISPLAY pane, it will show the output from maritime. The latter is the COMMAND pane, it is where maritime receives its input.
 
+## Commands
+
+(Check "src/main.c" for full list of commands.)
+```
++---------------------+----------------------+-------------------+
+|        Input        |     Description      |      Output       |
++---------------------+----------------------+-------------------+
+| a                   | Kill switch (1=on).  | %i                |
+| c                   | Sub location.        | %f %f %f %f %f %f |
+| d                   | Sub destination.     | %f %f %f %f %f %f |
+| p %f                | Set power (0-1).     | N/A               |
+| s %f %f %f %f %f %f | Set destination.     | N/A               |
+| r %f %f %f %f %f %f | Add relative state.  | N/A               |
+| h                   | Raw heading (0-360). | N/A               |
+| x                   | Reset all states.    | N/A               |
++---------------------+----------------------+-------------------+
+```
+Each 6 %f's represent a state, or sub position. The order of the numbers is
+X, Y, Z, Yaw, Pitch, Roll. This is relative to a North-East-Down coordinate
+frame.
+
 ## What's the name?
 ![why-maritime-name](docs/why-maritime-name.png)
 
