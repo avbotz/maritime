@@ -16,6 +16,6 @@ void init_killswitch()
 bool alive()
 {
     uint8_t current_state = gpio_pin_get_dt(&killswitch);
-    // SUB is ALIVE when state is 1
-    return current_state == 1;
+    // SUB is ALIVE when state is 0
+    return current_state == 0;
 }

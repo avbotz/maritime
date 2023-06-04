@@ -45,12 +45,13 @@
     };
 };
 
-/* Communicate with the killswitch as a gpio "button" on pin 31 (pb5) */
+/* Communicate with the killswitch as a gpio "button" on pin PH1 */
 / {
     buttons {
         compatible = "gpio-keys";
         killswitch_button: killswitch_button {
-            gpios = <&gpioc 31 GPIO_ACTIVE_HIGH>;
+            /* Pin PH1 -> gpioh 1 */
+            gpios = <&gpioh 1 GPIO_ACTIVE_HIGH>;
             label = "Killswitch modeled as a button";
         };
     };  
@@ -63,6 +64,8 @@
     current-speed = <115200>;
     status = "okay";
 };
+
+/* Communicate with AHRS via uart */
 
 /* Communicate with pressure sensor via i2c */
 &i2c1 {

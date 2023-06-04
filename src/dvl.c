@@ -104,8 +104,8 @@ void init_dvl()
     //     printk("Found UART device");
     // }
 
-    uart_irq_rx_enable(uart_device);
     uart_irq_callback_user_data_set(uart_device, uart_irq_callback, NULL);
+    uart_irq_rx_enable(uart_device);
 }
 
 void process_velocity() 

@@ -16,8 +16,8 @@ cd maritime
 
 ```sh
 ./compile.sh (local compile)
-west flash (flashes microcontroller)
-sudo ./comms.sh && sudo chmod 666 /dev/ttyACM* (init serial communication)
+west flash   (flashes microcontroller)
+./comms.sh   (init serial communication)
 ```
 
 ## Startup

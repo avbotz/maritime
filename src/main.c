@@ -8,6 +8,7 @@
 #include <zephyr/drivers/uart.h>
 #include <zephyr/sys_clock.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/logging/log.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
@@ -30,11 +31,13 @@
 /* change this to any other UART peripheral if desired */
 #define UART_DEVICE_NODE DT_CHOSEN(zephyr_shell_uart)
 
-#define MSG_SIZE 4096
+#define MSG_SIZE 256
 #define PAUSE_TIME 5000.0
 
-/* queue to store up to 10 messages (aligned to 4-byte boundary) */
-K_MSGQ_DEFINE(uart_msgq, MSG_SIZE, 10, 4);
+LOG_MODULE_REGISTER(LOG_LEVEL_INF);
+
+/* queue to store up to 3 messages (aligned to 4-byte boundary) */
+K_MSGQ_DEFINE(uart_msgq, MSG_SIZE, 3, 4);
 
 static const struct device *const uart_dev = DEVICE_DT_GET(UART_DEVICE_NODE);
 
@@ -44,7 +47,8 @@ static int rx_buf_pos;
 
 /*
  * Read characters from UART until line end is detected. Afterwards push the
- * data to the message queue.
+ * data to the message queue. We use this to read messages coming in 
+ * from the onboard computer.
  */
 void serial_cb(const struct device *dev, void *user_data)
 {
@@ -74,26 +78,9 @@ void serial_cb(const struct device *dev, void *user_data)
     }
 }
 
-/*
- * Print a null-terminated string character by character to the UART interface
- */
-void print_uart(char *buf)
-{
-    int msg_len = strlen(buf);
-
-    for (int i = 0; i < msg_len; i++) {
-        uart_poll_out(uart_dev, buf[i]);
-    }
-}
-
 int main(void)
 {
     // Initialize a bunch of variables
-    bool alive_state = alive();
-    bool alive_state_prev = alive_state;
-    bool pause = false;
-    uint32_t pause_time;
-
     uint32_t motor_time = k_uptime_get_32();
     bool velocity_override = false;
     bool angvel_override = false;
@@ -139,11 +126,6 @@ int main(void)
     char msg[MSG_SIZE];
     char delim[] = " ";
 
-    // if (!device_is_ready(uart_dev)) {
-    //     printk("UART device not found!");
-    //     return;
-    // }
-
     /* configure interrupt and callback to receive data */
     uart_irq_callback_user_data_set(uart_dev, serial_cb, NULL);
     uart_irq_rx_enable(uart_dev);
@@ -154,6 +136,11 @@ int main(void)
     init_servos();
     init_killswitch();
     // todo: init_ahrs(); init_thrusters();
+
+    bool alive_state = alive();
+    bool alive_state_prev = alive_state;
+    bool pause = false;
+    uint32_t pause_time;
 
     // TODO: here, set INITIAL_YAW = the initial ahrs yaw we sample
 
@@ -171,14 +158,11 @@ int main(void)
             // (we have a code of what characters mean)
             char *ptr = strtok(msg, delim);
             char c = ptr[0];
-
-            char output[MSG_SIZE];
             
             // Todo: Change this protocol to be more readable
             if (c == 'a')
             {
-                snprintf(output, sizeof(output), "%d\n", alive());
-                print_uart(output);
+                printk("%d\n", alive());
             }
             else if (c == 'b')
             {
@@ -196,24 +180,20 @@ int main(void)
             }
             else if (c == 'c')
             {
-                snprintf(output, sizeof(output),
-                    "%f %f %f %f %f %f\n",
+                printk("%f %f %f %f %f %f\n",
                     position.north,
                     position.east,
                     position.down,
                     rad_to_deg(attitude.yaw),
                     rad_to_deg(attitude.pitch),
                     rad_to_deg(attitude.roll));
-                print_uart(output);
             }
             else if (c == 'm')
             {
-                snprintf(output, sizeof(output),
-                    "%f %f %f\n",
+                printk("%f %f %f\n",
                     velocity_body.forward_m_s,
                     velocity_body.right_m_s,
                     velocity_body.down_m_s);
-                print_uart(output);
             }
             else if (c == 'p')
             {
@@ -283,8 +263,7 @@ int main(void)
             else if (c == 'w')
             {
                 // Send current altitude
-                snprintf(output, sizeof(output), "%f\n", position.altitude);
-                print_uart(output);
+                printk("%f\n", position.altitude);
             }
             else if (c == 'r')
             {
@@ -326,8 +305,7 @@ int main(void)
             else if (c == 'h')
             {
                 // Todo: implement ahrs sampling
-                // snprintf(output, sizeof(output), "%f\n", ahrs_get_yaw());
-                print_uart(output);
+                // printk("%f\n", ahrs_get_yaw());
             }
             else if (c == 'x')
             {
@@ -517,7 +495,7 @@ int main(void)
             mec_mix(&force_out, &torque_out, mix, power, thruster_outputs);
 
             // TODO: interface with thrusters to send them the thruster_outputs
-            // send_thrusts(thruster_outputs) // for example
+            send_thrusts(thruster_outputs) // for example
         }
     }
 }
