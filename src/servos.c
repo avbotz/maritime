@@ -50,19 +50,15 @@ void drop(int idx, int value)
 	}
 }
 
-void grab(int value)
+void grab(float value)
 {
-	// If requested, open up the grabber
-	if (value == 0)
-	{
-		pwm_set_pulse_dt(&grabber_servo, MINPULSEWIDTH);
-	}
-
-	// If requested, close the grabber (grab)
-	else if (value == 1)
-	{
-		pwm_set_pulse_dt(&grabber_servo, MAXPULSEWIDTH);
-	}
+	/* 
+	 * value = the fraction of closed you want it to be (0 to 1).
+	 * Eg. value = 0.6 = 60% closed.
+	 */
+	uint8_t pulse_width = (uint8_t) (MINPULSEWIDTH + 
+		value * (MAXPULSEWIDTH - MINPULSEWIDTH));
+	pwm_set_pulse_dt(&grabber_servo, pulse_width);
 }
 
 void shoot(int idx, int value)

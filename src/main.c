@@ -360,7 +360,7 @@ int main(void)
             }
             else if (c == 'f')
             {
-                int val = parse_int(ptr, delim);
+                float val = parse_float(ptr, delim);
                 grab(val);
             }
             else if (c == 'o')
@@ -495,7 +495,7 @@ int main(void)
             mec_mix(&force_out, &torque_out, mix, power, thruster_outputs);
 
             // TODO: interface with thrusters to send them the thruster_outputs
-            send_thrusts(thruster_outputs) // for example
+            send_thrusts(thruster_outputs); // for example
         }
     }
 }
