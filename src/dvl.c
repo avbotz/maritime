@@ -78,7 +78,7 @@ void uart_irq_callback(const struct device *dev, void *data)
 
             if (rx_byte == 'w') {
                 if (seen_start) {
-                    printk("See new start byte without previous end byte");
+                    // printk("See new start byte without previous end byte");
                 }
                 seen_start = true;
             }
@@ -222,7 +222,7 @@ void process_frame()
     
     buf[len] = 0; // for ending string, can remove
     
-    printk("received total frame: %s\r\n", buf);
+    // printk("received total frame: %s\r\n", buf);
     if (buf[1] == 'r') {
         if (buf[2] == 'z') {
             process_velocity();
