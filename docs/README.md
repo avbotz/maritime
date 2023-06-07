@@ -1,5 +1,5 @@
 # Sensors (STM32 Nucleo-F767ZI)
-Documentation of each sensor in Maritime (our low level control stack), interfaced using Zephyr Project's framework.
+Documentation of each sensor in Maritime (our low level control stack), interfaced using Zephyr Project's RTOS.
 
 ## General Starters for interfacing with a sensor
 * Each sensor should be defined in the device tree file ({board-name}.overlay)
