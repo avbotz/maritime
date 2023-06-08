@@ -11,7 +11,7 @@
         compatible = "pwm-servo";
         pwms = <&pwm1 3 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
         min-pulse = <PWM_USEC(850)>;
-        max-pulse = <PWM_USEC(2350)>;
+        max-pulse = <PWM_USEC(2220)>; /* This sus value works */
     };
 
     /* The grabber servo is the ser-120x model */
@@ -30,7 +30,9 @@
     };
 };
 
-/* Define timers for the pwm; pwm1 is already defined by default */
+/* Define timers for the pwm; pwm1 is already defined on pin pe13 by default  
+ * in zephyr's Nucleo f767zi dts file on their github.
+ */
 &timers2{
     pwm2: pwm {
         status = "okay";
