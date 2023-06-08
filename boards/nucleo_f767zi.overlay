@@ -6,21 +6,23 @@
  */
 
 / {
-    servo1: servo1 {
+    /* Grabber and shooter servos are ser-110x model */
+    dropper_servo: dropper_servo {
         compatible = "pwm-servo";
         pwms = <&pwm1 3 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
         min-pulse = <PWM_USEC(850)>;
         max-pulse = <PWM_USEC(2350)>;
     };
 
-    servo2: servo2 {
+    /* The grabber servo is the ser-120x model */
+    grabber_servo: grabber_servo {
         compatible = "pwm-servo";
         pwms = <&pwm2 1 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
-        min-pulse = <PWM_USEC(850)>;
-        max-pulse = <PWM_USEC(2350)>;
+        min-pulse = <PWM_USEC(800)>;
+        max-pulse = <PWM_USEC(2100)>;
     };
 
-    servo3: servo3 {
+    shooter_servo: shooter_servo {
         compatible = "pwm-servo";
         pwms = <&pwm3 1 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
         min-pulse = <PWM_USEC(850)>;
