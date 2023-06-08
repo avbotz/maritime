@@ -156,8 +156,9 @@ int main(void)
         {
             // Get the first character 
             // (we have a code of what characters mean)
-            char *ptr = strtok(msg, delim);
-            char c = ptr[0];
+            char *save_ptr;
+            char *token = strtok_r(msg, delim, &save_ptr);
+            char c = token[0];
             
             // Todo: Change this protocol to be more readable
             if (c == 'a')
@@ -168,7 +169,7 @@ int main(void)
             {
                 // Set altitude setpoint (which overrides depth) if it's valid
                 velocity_override = false;
-                float value = parse_float(ptr, delim);
+                float value = parse_float(delim, &save_ptr);
                 if (value == -1)
                     pos_controller.use_floor_altitude = false;
                 else
@@ -198,7 +199,7 @@ int main(void)
             else if (c == 'p')
             {
                 // Ranges from 0-1, 1 = 100% thruster power
-                power = parse_float(ptr, delim);
+                power = parse_float(delim, &save_ptr);
             }
             else if (c == 's')
             {
@@ -206,19 +207,19 @@ int main(void)
                 velocity_override = false;
                 angvel_override = false;
 
-                position_sp.north = parse_float(ptr, delim);
-                position_sp.east = parse_float(ptr, delim);
+                position_sp.north = parse_float(delim, &save_ptr);
+                position_sp.east = parse_float(delim, &save_ptr);
 
                 // Only save z setpoint if it's valid
-                float value = parse_float(ptr, delim);
+                float value = parse_float(delim, &save_ptr);
                 if (value != -1)
                     position_sp.down = value;
 
-                att_sp.yaw = deg_to_rad(parse_float(ptr, delim));
+                att_sp.yaw = deg_to_rad(parse_float(delim, &save_ptr));
 
                 // For now, keep pitch and roll at 0
-                // att_sp.pitch = deg_to_rad(parse_float(ptr, delim));
-                // att_sp.roll = deg_to_rad(parse_float(ptr, delim));
+                // att_sp.pitch = deg_to_rad(parse_float(delim, &save_ptr));
+                // att_sp.roll = deg_to_rad(parse_float(delim, &save_ptr));
 
                 position_controller_update_sp(&pos_controller, &position_sp);
                 att_controller_update_sp(&attitude_controller, &att_sp);
@@ -227,9 +228,9 @@ int main(void)
             {
                 velocity_override = true;
 
-                velocity_body_sp.forward_m_s = parse_float(ptr, delim);
-                velocity_body_sp.right_m_s = parse_float(ptr, delim);
-                velocity_body_sp.down_m_s = parse_float(ptr, delim);
+                velocity_body_sp.forward_m_s = parse_float(delim, &save_ptr);
+                velocity_body_sp.right_m_s = parse_float(delim, &save_ptr);
+                velocity_body_sp.down_m_s = parse_float(delim, &save_ptr);
 
                 velocity_controller_update_sp(&vel_controller, &velocity_body_sp);
             }
@@ -238,9 +239,9 @@ int main(void)
                 // Only write the angle setpoint
                 angvel_override = false;
 
-                att_sp.yaw = deg_to_rad(parse_float(ptr, delim));
-                att_sp.pitch = deg_to_rad(parse_float(ptr, delim));
-                att_sp.roll = deg_to_rad(parse_float(ptr, delim));
+                att_sp.yaw = deg_to_rad(parse_float(delim, &save_ptr));
+                att_sp.pitch = deg_to_rad(parse_float(delim, &save_ptr));
+                att_sp.roll = deg_to_rad(parse_float(delim, &save_ptr));
 
                 att_controller_update_sp(&attitude_controller, &att_sp);
             }
@@ -248,16 +249,16 @@ int main(void)
             {
                 angvel_override = true;
 
-                angvel_sp.yaw_rad_s = deg_to_rad(parse_float(ptr, delim));
-                angvel_sp.pitch_rad_s = deg_to_rad(parse_float(ptr, delim));
-                angvel_sp.roll_rad_s = deg_to_rad(parse_float(ptr, delim));
+                angvel_sp.yaw_rad_s = deg_to_rad(parse_float(delim, &save_ptr));
+                angvel_sp.pitch_rad_s = deg_to_rad(parse_float(delim, &save_ptr));
+                angvel_sp.roll_rad_s = deg_to_rad(parse_float(delim, &save_ptr));
 
                 angvel_controller_update_sp(&angular_velocity_controller, &angvel_sp);
             }
             else if (c == 'z')
             {
                 velocity_override = false;
-                position_sp.down = parse_float(ptr, delim);
+                position_sp.down = parse_float(delim, &save_ptr);
                 position_controller_update_sp(&pos_controller, &position_sp);
             }
             else if (c == 'w')
@@ -279,7 +280,7 @@ int main(void)
                 float offsets[3];
                 // TODO: make BODY_DOF = 3 (readable constant)
                 for (int i = 0; i < 3; i++)
-                    offsets[i] = parse_float(ptr, delim);
+                    offsets[i] = parse_float(delim, &save_ptr);
                 float angle[3] = {
                     deg_to_rad(attitude.yaw), 
                     deg_to_rad(attitude.pitch),
@@ -293,11 +294,11 @@ int main(void)
                 position_sp.down += absolute_offsets[2];
 
                 att_sp.yaw = angle_add(attitude.yaw, 
-                    deg_to_rad(parse_float(ptr, delim)));
+                    deg_to_rad(parse_float(delim, &save_ptr)));
                 att_sp.pitch = angle_add(attitude.pitch, 
-                    deg_to_rad(parse_float(ptr, delim)));
+                    deg_to_rad(parse_float(delim, &save_ptr)));
                 att_sp.roll = angle_add(attitude.roll, 
-                    deg_to_rad(parse_float(ptr, delim)));
+                    deg_to_rad(parse_float(delim, &save_ptr)));
 
                 position_controller_update_sp(&pos_controller, &position_sp);
                 att_controller_update_sp(&attitude_controller, &att_sp);
@@ -324,19 +325,19 @@ int main(void)
             }
             else if (c == 'g')
             {
-                int idx = parse_int(ptr, delim);
-                int val = parse_int(ptr, delim);
+                int idx = parse_int(delim, &save_ptr);
+                int val = parse_int(delim, &save_ptr);
                 drop(idx, val);
             }
             else if (c == 'u')
             {
                 // Expects message of 
                 // u <int representing degree of freedom> <0 for position, 1 for velocity> <gain1> <gain2> <gain3>
-                int dof = parse_int(ptr, delim);
-                int position_or_vel = parse_int(ptr, delim);
+                int dof = parse_int(delim, &save_ptr);
+                int position_or_vel = parse_int(delim, &save_ptr);
                 float gains[3];
                 for (int i = 0; i < 3; i++)
-                    gains[i] = parse_float(ptr, delim);
+                    gains[i] = parse_float(delim, &save_ptr);
 
                 // Adjust the x, y, or z gain
                 if (dof <= 2)
@@ -360,13 +361,13 @@ int main(void)
             }
             else if (c == 'f')
             {
-                float val = parse_float(ptr, delim);
+                float val = parse_float(delim, &save_ptr);
                 grab(val);
             }
             else if (c == 'o')
             {
-                int idx = parse_int(ptr, delim);
-                int val = parse_int(ptr, delim);
+                int idx = parse_int(delim, &save_ptr);
+                int val = parse_int(delim, &save_ptr);
                 shoot(idx, val);
             }
         }

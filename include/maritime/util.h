@@ -1,9 +1,9 @@
 #ifndef _MARITIME_UTIL_H
 #define _MARITIME_UTIL_H
 
-int parse_int(char *ptr, char *delim);
+int parse_int(char *delim, char **save_ptr);
 
-float parse_float(char *ptr, char *delim);
+float parse_float(char *delim, char **save_ptr);
 
 float rad_to_deg(float rad);
 

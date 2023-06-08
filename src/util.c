@@ -2,6 +2,7 @@
  * Various helper functions to help do stuff
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 #include "maritime/util.h"
 
@@ -10,22 +11,22 @@
 
 /* 
  * Parse a token of a string pointer received over UART as an int.
- * Assumes we have already called strtok(), and we are passing 
- * that pointer in
+ * Assumes we have already called strtok_r(), and we are passing 
+ * that save_ptr (the save state of the string) pointer in
  */
-int parse_int(char *ptr, char *delim)
+int parse_int(char *delim, char **save_ptr)
 {
-    ptr = strtok(NULL, delim);
-    return atoi(ptr);
+    char *token = strtok_r(NULL, delim, save_ptr);
+    return atoi(token);
 }
 
 /*
  * Parse a token of a string pointer as a float
  */
-float parse_float(char *ptr, char *delim)
+float parse_float(char *delim, char **save_ptr)
 {
-    ptr = strtok(NULL, delim);
-    return atof(ptr);
+    char *token = strtok_r(NULL, delim, save_ptr);
+    return atof(token);
 }
 
 /*
