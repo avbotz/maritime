@@ -1,8 +1,8 @@
 /* Ask chatgpt if u don't understand some of this stuff */
 
-/* 
- * Communicate with the servos (that control dropper, grabber, shooter) 
- * via pwm 
+/*
+ * Communicate with the servos (that control dropper, grabber, shooter)
+ * via pwm
  */
 
 / {
@@ -24,13 +24,13 @@
 
     shooter_servo: shooter_servo {
         compatible = "pwm-servo";
-        pwms = <&pwm3 1 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        pwms = <&pwm3 2 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
         min-pulse = <PWM_USEC(850)>;
         max-pulse = <PWM_USEC(2350)>;
     };
 };
 
-/* Define timers for the pwm; pwm1 is already defined on pin pe13 by default  
+/* Define timers for the pwm; pwm1 is already defined on pin pe13 by default
  * in zephyr's Nucleo f767zi dts file on their github.
  */
 &timers2{
@@ -44,7 +44,7 @@
 &timers3{
     pwm3: pwm {
         status = "okay";
-        pinctrl-0 = <&tim3_ch1_pa6>;
+        pinctrl-0 = <&tim3_ch2_pb5>;
         pinctrl-names = "default";
     };
 };
@@ -58,7 +58,7 @@
             gpios = <&gpioh 1 GPIO_ACTIVE_HIGH>;
             label = "Killswitch modeled as a button";
         };
-    };  
+    };
 };
 
 /* Communicate with DVL via uart */
