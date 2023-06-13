@@ -23,8 +23,8 @@ static const uint32_t shooter_max_pulse = DT_PROP(DT_NODELABEL(shooter_servo), m
 static const uint32_t shooter_mid_pulse = (shooter_min_pulse + shooter_max_pulse) / 2;
 
 /*
- * min pulse = min angle = left hole
- * max pulse = max angle = right hole
+ * see if min pulse opens left or right hole thru manual testing
+ * max/min pulse = max magnitude of angle that servo turns
  */
 
 void init_servos()
@@ -32,7 +32,11 @@ void init_servos()
 	/* Set all of the servos to go to the middle (neutral) position */
 	pwm_set_pulse_dt(&dropper_servo, dropper_mid_pulse);
 	pwm_set_pulse_dt(&grabber_servo, grabber_range_min_pulse);
-	pwm_set_pulse_dt(&shooter_servo, shooter_mid_pulse);
+	int ret = pwm_set_pulse_dt(&shooter_servo, shooter_mid_pulse);
+
+	if (ret < 0) {
+		printk("Error %d: failed to set pulse width\n", ret);
+	}
 }
 
 void drop(int idx, int value)
@@ -80,12 +84,12 @@ void shoot(int idx, int value)
 		// Set servo to open the 0th (right) hole
 		if (idx == 0)
 		{
-			pwm_set_pulse_dt(&shooter_servo, shooter_max_pulse);
+			pwm_set_pulse_dt(&shooter_servo, shooter_min_pulse);
 		}
 		// Set servo to open the 1st (left) hole
 		else if (idx == 1)
 		{
-			pwm_set_pulse_dt(&shooter_servo, shooter_min_pulse);
+			pwm_set_pulse_dt(&shooter_servo, shooter_max_pulse);
 		}
 	}
 }

@@ -133,7 +133,7 @@ int main(void)
     // Initialize sensor communications
     init_dvl();
     init_pressure();
-    init_servos();
+    // init_servos();
     init_killswitch();
     // todo: init_ahrs(); init_thrusters();
 
