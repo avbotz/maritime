@@ -17,14 +17,14 @@
     /* The grabber servo is the ser-120x model */
     grabber_servo: grabber_servo {
         compatible = "pwm-servo";
-        pwms = <&pwm2 2 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        pwms = <&pwm3 3 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
         min-pulse = <PWM_USEC(800)>;
         max-pulse = <PWM_USEC(2100)>;
     };
 
     shooter_servo: shooter_servo {
         compatible = "pwm-servo";
-        pwms = <&pwm3 3 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        pwms = <&my_pwm4 4 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
         min-pulse = <PWM_USEC(850)>;
         max-pulse = <PWM_USEC(2220)>;
     };
@@ -33,31 +33,28 @@
 /* 
  * Map ports to their respective timers: https://github.com/micropython/micropython/blob/master/ports/stm32/boards/stm32f767_af.csv
  */
+
 &timers2{
+    st,prescaler = <10000>;
+    status = "okay";
     pwm1: pwm {
         status = "okay";
         pinctrl-0 = <&tim2_ch1_pa0>;
         pinctrl-names = "default";
     };
 
-    pwm2: pwm {
-        status = "okay";
-        pinctrl-0 = <&tim2_ch2_pa1>;
-        pinctrl-names = "default";
-    };
-};
-
-&timers4{
-    st,prescaler = <10000>;
-    status = "okay";
-
     pwm3: pwm {
         status = "okay";
-        pinctrl-0 = <&tim4_ch3_pd14>;
+        pinctrl-0 = <&tim2_ch3_pa2>;
+        pinctrl-names = "default";
+    };
+
+    my_pwm4: pwm {
+        status = "okay";
+        pinctrl-0 = <&tim2_ch4_pa3>;
         pinctrl-names = "default";
     };
 };
-
 
 /* Communicate with the killswitch as a gpio "button" on pin PH1 */
 / {

@@ -135,14 +135,15 @@ int main(void)
     init_pressure();
     init_servos();
     init_killswitch();
-    // todo: init_ahrs(); init_thrusters();
+    init_ahrs();
+    init_thrusters();
 
     bool alive_state = alive();
     bool alive_state_prev = alive_state;
     bool pause = false;
     uint32_t pause_time;
 
-    // TODO: here, set INITIAL_YAW = the initial ahrs yaw we sample
+    INITIAL_YAW = ahrs_get_yaw();
 
     // Begin motor control loop
     while (true)
@@ -306,7 +307,7 @@ int main(void)
             else if (c == 'h')
             {
                 // Todo: implement ahrs sampling
-                // printk("%f\n", ahrs_get_yaw());
+                printk("%f\n", ahrs_get_yaw());
             }
             else if (c == 'x')
             {
@@ -407,8 +408,7 @@ int main(void)
             attitude.yaw = 0.;
             att_sp.yaw = 0.;
 
-            // TODO: set INITIAL_YAW = current ahrs yaw reading
-            // INITIAL_YAW = 
+            INITIAL_YAW = ahrs_get_yaw();
 
             pos_controller.use_floor_altitude = false;
 
@@ -425,16 +425,14 @@ int main(void)
         {
             position.down = pressure_get_depth();
 
-            // Todo: implement ahrs sampling here
+            angvel.roll_rad_s = ahrs_get_roll_rad_s();
+            angvel.pitch_rad_s = ahrs_get_pitch_rad_s();
+            angvel.yaw_rad_s = ahrs_get_yaw_rad_s();
 
-            // angvel.roll_rad_s = ahrs_get_roll_rad_s()
-            // angvel.pitch_rad_s = ahrs_get_pitch_rad_s()
-            // angvel.yaw_rad_s = ahrs_get_yaw_rad_s()
-
-            // attitude.yaw = ahrs_get_yaw() - INITIAL_YAW
-            // attitude.pitch = ahrs_get_pitch()
-            // attitude.roll = ahrs_get_roll()
-            // position.altitude = dvl_get_altitude()
+            attitude.yaw = ahrs_get_yaw() - INITIAL_YAW;
+            attitude.pitch = ahrs_get_pitch();
+            attitude.roll = ahrs_get_roll();
+            position.altitude = dvl_get_altitude();
           
             // Handle angle overflow/underflow.
             attitude.yaw += (attitude.yaw > M_PI) ? -2*M_PI : (attitude.yaw < -M_PI) ? 2*M_PI : 0;

@@ -34,6 +34,9 @@
  * in zephyr's Nucleo f767zi dts file on their github.
  */
 &timers2{
+    st,prescaler = <10000>;
+    status = "okay";
+    
     pwm1_custom: pwm {
         status = "okay";
         pinctrl-0 = <&tim2_ch1_pa0>;
