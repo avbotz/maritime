@@ -76,7 +76,7 @@
     pinctrl-0 = <&uart4_tx_pb9 &uart4_rx_pb8>;
     pinctrl-names = "default";
     current-speed = <115200>;
-    status = "okay";
+    status = "disabled";
 };
 
 /* Communicate with AHRS via uart */
@@ -114,3 +114,24 @@ can1 already enabled, alias zephyr,canbus = &can1;
     status = "okay";
 };
 */
+
+/* Read the pressure sensor, via an analog to digital converter */
+/ {
+    zephyr,user {
+        /* adjust channel number according to pinmux in board.dts */
+        io-channels = <&adc3 1>;
+    };
+};
+
+&adc3 {
+    #address-cells = <1>;
+    #size-cells = <0>;
+
+    channel@1 {
+        reg = <1>;
+        zephyr,gain = "ADC_GAIN_1";
+        zephyr,reference = "ADC_REF_INTERNAL";
+        zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+        zephyr,resolution = <10>;
+    };
+};

@@ -109,3 +109,10 @@ can1 already enabled, alias zephyr,canbus = &can1;
     status = "okay";
 };
 */
+
+/* Read the pressure sensor, via an analog to digital converter */
+&adc1 {
+    pinctrl-0 = <&adc1_in0_pa6>;
+    pinctrl-names = "default";
+    status = "okay";
+};

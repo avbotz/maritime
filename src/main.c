@@ -85,7 +85,7 @@ int main(void)
     bool velocity_override = false;
     bool angvel_override = false;
     float power = 0;
-    float INITIAL_YAW;
+    float INITIAL_YAW, INITIAL_PRESSURE;
 
     float mix[8][6];
     memcpy(mix, sub_mix_data, sizeof(float) * NUM_THRUSTERS * NUM_DOF);
@@ -143,6 +143,11 @@ int main(void)
     uint32_t pause_time;
 
     // TODO: here, set INITIAL_YAW = the initial ahrs yaw we sample
+    INITIAL_YAW = ahrs_get_yaw();
+
+    // Sample twice to avoid error
+    INITIAL_PRESSURE = pressure_get_reading();
+    INITIAL_PRESSURE = pressure_get_reading();
 
     // Begin motor control loop
     while (true)
@@ -306,7 +311,7 @@ int main(void)
             else if (c == 'h')
             {
                 // Todo: implement ahrs sampling
-                // printk("%f\n", ahrs_get_yaw());
+                printk("%f\n", ahrs_get_yaw());
             }
             else if (c == 'x')
             {
@@ -370,6 +375,10 @@ int main(void)
                 int val = parse_int(delim, &save_ptr);
                 shoot(idx, val);
             }
+            else if (c == '#')
+            {
+                printk("%d\n", pressure_get_reading());
+            }
         }
 
         alive_state_prev = alive_state;
@@ -423,18 +432,17 @@ int main(void)
         // intended.
         if (!pause && alive_state)
         {
-            position.down = pressure_get_depth();
+            // Update position tracking by reading sensors
+            position.down = (pressure_get_reading() - INITIAL_PRESSURE) / 60.;
 
-            // Todo: implement ahrs sampling here
+            angvel.roll_rad_s = ahrs_get_roll_rad_s();
+            angvel.pitch_rad_s = ahrs_get_pitch_rad_s();
+            angvel.yaw_rad_s = ahrs_get_yaw_rad_s();
 
-            // angvel.roll_rad_s = ahrs_get_roll_rad_s()
-            // angvel.pitch_rad_s = ahrs_get_pitch_rad_s()
-            // angvel.yaw_rad_s = ahrs_get_yaw_rad_s()
-
-            // attitude.yaw = ahrs_get_yaw() - INITIAL_YAW
-            // attitude.pitch = ahrs_get_pitch()
-            // attitude.roll = ahrs_get_roll()
-            // position.altitude = dvl_get_altitude()
+            attitude.yaw = ahrs_get_yaw() - INITIAL_YAW;
+            attitude.pitch = ahrs_get_pitch();
+            attitude.roll = ahrs_get_roll();
+            position.altitude = dvl_get_altitude();
           
             // Handle angle overflow/underflow.
             attitude.yaw += (attitude.yaw > M_PI) ? -2*M_PI : (attitude.yaw < -M_PI) ? 2*M_PI : 0;

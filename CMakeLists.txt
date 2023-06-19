@@ -3,8 +3,9 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(maritime)
 
 FILE(GLOB app_sources 
-	src/*.c 
-	extern/maritime_ec/src/*.c
+	# src/*.c 
+	src/pressure.c
+	# extern/maritime_ec/src/*.c
 )
 target_sources(app PRIVATE ${app_sources})
 

@@ -5,12 +5,21 @@
 #include <stdio.h>
 #include <zephyr/kernel.h>
 #include <math.h>
-
+#include <zephyr/drivers/adc.h>
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(main);
 
-struct sensor_value oversampling_rate = { 8192, 0 };
-const struct device *const dev = DEVICE_DT_GET_ANY(meas_ms5837);
+#define DT_SPEC_AND_COMMA(node_id, prop, idx) \
+	ADC_DT_SPEC_GET_BY_IDX(node_id, idx),
+
+/* Data of ADC io-channels specified in devicetree. */
+static const struct adc_dt_spec adc_channels[] = {
+	DT_FOREACH_PROP_ELEM(DT_PATH(zephyr_user), io_channels,
+			     DT_SPEC_AND_COMMA)
+};
+
+static const struct adc_dt_spec adc_channel = adc_channels[0];
+
+LOG_MODULE_REGISTER(main);
 
 void init_pressure()
 {
@@ -33,20 +42,36 @@ void init_pressure()
 	// 	return;
 	// }
 
-	sensor_attr_set(dev, SENSOR_CHAN_ALL, SENSOR_ATTR_OVERSAMPLING,
-		&oversampling_rate);
+	// sensor_attr_set(dev, SENSOR_CHAN_ALL, SENSOR_ATTR_OVERSAMPLING,
+	// 	&oversampling_rate);
+
+	if (adc_channel_setup_dt(&adc_channel) < 0) {
+	    // Handle ADC channel setup error
+	    return;
+	}
 }
 
-float pressure_get_depth()
+uint16_t pressure_get_reading()
 {
-	/* Calculates current depth based on pressure reading */
-	struct sensor_value press;
+	// Return integer that is proportional with pressure
+	uint16_t buf;
+	struct adc_sequence sequence = {
+		.buffer = &buf,
+		/* buffer size in bytes, not number of samples */
+		.buffer_size = sizeof(buf),
+	};
 
-	sensor_sample_fetch(dev);
-	sensor_channel_get(dev, SENSOR_CHAN_PRESS, &press);
+	adc_sequence_init_dt(&adc_channel, &sequence);
 
-	float pressure_kPa = press.val1 + press.val2 * pow(10, -6);
-	float depth = (pressure_kPa - 101.325) / 9.80638;
+	adc_read(adc_channel.dev, &sequence);
 
-	return depth;
+	return buf;
+}
+
+int main() {
+	while (1) {
+		printk("%d\n", pressure_get_reading());
+		k_sleep(K_MSEC(500));
+	}
+	
 }
