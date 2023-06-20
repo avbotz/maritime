@@ -45,8 +45,12 @@ float pressure_get_depth()
 	sensor_sample_fetch(dev);
 	sensor_channel_get(dev, SENSOR_CHAN_PRESS, &press);
 
-	float pressure_kPa = press.val1 + press.val2 * pow(10, -6);
-	float depth = (pressure_kPa - 101.325) / 9.80638;
+	float pressure_reading = press.val1 + press.val2 * pow(10, -6);
+
+	// Convert pressure reading to depth.
+	// Sus, this is manually calibrated b/c pressure sensor is damaged
+	// and not outputting correct units
+	float depth = (pressure_reading - 5.123) * 1.997;
 
 	return depth;
 }
