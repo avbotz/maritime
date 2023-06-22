@@ -2,6 +2,7 @@
 
 #include <zephyr/device.h>
 #include <zephyr/drivers/sensor.h>
+#include <zephyr/drivers/i2c.h>
 #include <stdio.h>
 #include <zephyr/kernel.h>
 #include <math.h>
@@ -12,45 +13,28 @@ LOG_MODULE_REGISTER(main);
 struct sensor_value oversampling_rate = { 8192, 0 };
 const struct device *const dev = DEVICE_DT_GET_ANY(meas_ms5837);
 
+static const struct gpio_dt_spec pressure_adc = 
+    I2C_DT_SPEC_GET(DT_NODELABEL(external_adc));
+
 void init_pressure()
 {
-	/* Initialize communication with the pressure sensor */
-	// if (dev == NULL) {
-	// 	LOG_ERR("Could not find MS5837 device, aborting test.");
-	// 	return;
-	// }
-	// if (!device_is_ready(dev)) {
-	// 	LOG_ERR("MS5837 device %s is not ready, aborting test.",
-	// 		dev->name);
-	// 	return;
-	// }
-
-	// if (sensor_attr_set(dev, SENSOR_CHAN_ALL, SENSOR_ATTR_OVERSAMPLING,
-	// 			&oversampling_rate) != 0) {
-	// 	LOG_ERR("Could not set oversampling rate of %d "
-	// 		"on MS5837 device, aborting test.",
-	// 		oversampling_rate.val1);
-	// 	return;
-	// }
-
-	sensor_attr_set(dev, SENSOR_CHAN_ALL, SENSOR_ATTR_OVERSAMPLING,
-		&oversampling_rate);
+	if (!device_is_ready(pressure_adc))
+	{
+		printk("I2C bus %s is not ready!\n\r",pressure_adc.bus->name);
+		return;
+	}
 }
 
-float pressure_get_depth()
+bool pressure_get_depth()
 {
-	/* Calculates current depth based on pressure reading */
-	struct sensor_value press;
+	// Get data from i2c
+	uint8_t buffer[2];
+	ret = i2c_read_dt(&pressure_adc, buffer, sizeof(buffer));
+	if(ret != 0){
+		printk("Failed to read from I2C device address %x at Reg. %x n", pressure_adc->addr,config[0]);
+	}
 
-	sensor_sample_fetch(dev);
-	sensor_channel_get(dev, SENSOR_CHAN_PRESS, &press);
-
-	float pressure_reading = press.val1 + press.val2 * pow(10, -6);
-
-	// Convert pressure reading to depth.
-	// Sus, this is manually calibrated b/c pressure sensor is damaged
-	// and not outputting correct units
-	float depth = (pressure_reading - 5.123) * 1.997;
-
-	return depth;
+    uint16_t adc_value = (buffer[0] << 8) | buffer[1];
+    float depth = (adc_value - 893) / 260.;
+    return depth;
 }

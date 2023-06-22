@@ -87,7 +87,7 @@
     status = "okay";
 };
 
-/* Communicate with pressure sensor via i2c */
+/* Communicate with pressure sensor's external adc via i2c */
 &i2c1 {
     status = "disabled";
 };
@@ -97,9 +97,12 @@
     pinctrl-names = "default";
     status = "okay";
     clock-frequency = <I2C_BITRATE_STANDARD>;
-    ms5837@76 {
-        compatible = "meas,ms5837";
-        reg = <0x76>;
+    
+    /* Connect to external adc's GND, so the address is 0x48 */
+    external_adc@48 {
+        compatible = "i2c-device";
+        reg = <0x48>;
+        label = "EXTERNAL_ADC";
     };
 };
 
