@@ -1,14 +1,23 @@
-cmake_minimum_required(VERSION 3.13.1)
+cmake_minimum_required(VERSION 3.24.3)
+
+# add_definitions(__MISC_VISIBLE)
+# set_property(GLOBAL PROPERTY CSTD gnu99)
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
-project(maritime)
+project(maritime-v1)
 
-FILE(GLOB app_sources 
-	src/*.c 
-	extern/maritime_ec/src/*.c
+# if you have an include directory, you can include it here
+target_include_directories(app PRIVATE 
+                           include/
+                           dsdl/uavcan/include
+                           libcanard/
+                           maritime_ec/include/
 )
+
+FILE(GLOB app_sources
+    src/*.c 
+    maritime_ec/src/*.c
+    dsdl/uavcan/src/*.c
+    libcanard/canard.c
+)
+
 target_sources(app PRIVATE ${app_sources})
-
-target_include_directories(app PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/extern/maritime_ec/include
-)

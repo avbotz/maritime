@@ -1,43 +1,33 @@
-/*
- * Various helper functions to help do stuff
- */
+#include <zephyr/kernel.h>
+
+#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "maritime/util.h"
 
-#define PI 3.141592653
+#include "util.h"
+#include "strtok.h"
 
+const float DEG_TO_RAD = M_PI / 180.0f;
+const float RAD_TO_DEG = 180.0f / M_PI;
 
-/* 
- * Parse a token of a string pointer received over UART as an int.
- * Assumes we have already called strtok_r(), and we are passing 
- * that save_ptr (the save state of the string) pointer in
- */
-int parse_int(char *delim, char **save_ptr)
-{
+uint32_t time_us() { return k_cyc_to_us_ceil32(k_cycle_get_32()); }
+
+int parse_int(char *delim, char **save_ptr) {
     char *token = strtok_r(NULL, delim, save_ptr);
     return atoi(token);
 }
 
-/*
- * Parse a token of a string pointer as a float
- */
-float parse_float(char *delim, char **save_ptr)
-{
+float parse_float(char *delim, char **save_ptr) {
     char *token = strtok_r(NULL, delim, save_ptr);
     return atof(token);
 }
 
-/*
- * Conversions (todo: put these in a util.c file)
- */
-float rad_to_deg(float rad)
-{
-    return rad / PI * 180.;
+float rad_to_deg(float rad) {
+    return rad * RAD_TO_DEG;
 }
 
-float deg_to_rad(float deg)
-{
-    return deg / 180. * PI;
+float deg_to_rad(float deg) {
+    return deg * DEG_TO_RAD;
 }
+

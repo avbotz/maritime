@@ -15,13 +15,13 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include "maritime/dvl.h"
-#include "maritime/ahrs.h"
-#include "maritime/pressure.h"
-#include "maritime/thrusters.h"
-#include "maritime/servos.h"
-#include "maritime/killswitch.h"
-#include "maritime/util.h"
+#include "dvl.h"
+#include "ahrs.h"
+#include "pressure.h"
+#include "thruster.h"
+#include "servo.h"
+#include "killswitch.h"
+#include "util.h"
 
 #include "mec/control.h"
 #include "mec/estimation.h"
@@ -81,7 +81,11 @@ void serial_cb(const struct device *dev, void *user_data)
 int main(void)
 {
     // Initialize a bunch of variables
-    uint32_t motor_time = k_uptime_get_32();
+    struct dvl_data_s dvl_data;
+    struct ahrs_data_s ahrs_data;
+    struct pressure_data_s pressure_data;
+
+    uint32_t motor_time = time_us();
     bool velocity_override = false;
     bool angvel_override = false;
     float power = 0;
@@ -126,30 +130,30 @@ int main(void)
     char msg[MSG_SIZE];
     char delim[] = " ";
 
-    /* configure interrupt and callback to receive data */
     uart_irq_callback_user_data_set(uart_dev, serial_cb, NULL);
     uart_irq_rx_enable(uart_dev);
 
-    // Initialize sensor communications
-    init_dvl();
-    init_pressure();
-    init_servos();
-    init_killswitch();
-    // todo: init_ahrs(); init_thrusters();
+    setup_thrusters();
+    setup_dvl();
+    setup_ahrs();
+    setup_pressure();
+    setup_servos();
+    setup_killswitch();
 
     bool alive_state = alive();
     bool alive_state_prev = alive_state;
     bool pause = false;
     uint32_t pause_time;
 
-    // TODO: here, set INITIAL_YAW = the initial ahrs yaw we sample
+    bool dvl_updated = false;
+    bool ahrs_updated = false;
+    bool pressure_updated = false;
 
-    // Begin motor control loop
-    while (true)
-    {
-        velocity_body.forward_m_s = dvl_get_velocity_x();
-        velocity_body.right_m_s = dvl_get_velocity_y();
-        velocity_body.down_m_s = dvl_get_velocity_z();
+    while (true) {
+        int ret;
+        ret = k_msgq_get(&ahrs_data_msgq, &ahrs_data, K_NO_WAIT);
+        ret = k_msgq_get(&dvl_data_msgq, &dvl_data, K_NO_WAIT);
+        ret = k_msgq_get(&pressure_data_msgq, &pressure_data, K_NO_WAIT);
 
         // Parse message coming from computer if there is one
         if (k_msgq_get(&uart_msgq, &msg, K_NO_WAIT) == 0)
@@ -282,9 +286,9 @@ int main(void)
                 for (int i = 0; i < 3; i++)
                     offsets[i] = parse_float(delim, &save_ptr);
                 float angle[3] = {
-                    deg_to_rad(attitude.yaw), 
-                    deg_to_rad(attitude.pitch),
-                    deg_to_rad(attitude.roll)
+                    attitude.roll, 
+                    attitude.pitch,
+                    attitude.yaw
                 };
                 float absolute_offsets[3];
                 offsets_to_frame(offsets, angle, absolute_offsets);
@@ -305,8 +309,17 @@ int main(void)
             }
             else if (c == 'h')
             {
+                printk("%f\n", rad_to_deg(ahrs_data.yaw));
+            }
+            else if (c == 'd')
+            {
                 // Todo: implement ahrs sampling
-                // printk("%f\n", ahrs_get_yaw());
+                printk("%f %f %f %f\n", 
+                    dvl_data.velocity_x, 
+                    dvl_data.velocity_y, 
+                    dvl_data.velocity_z, 
+                    dvl_data.altitude);
+                //printk("%f\n", rad_to_deg(ahrs_data.yaw));
             }
             else if (c == 'x')
             {
@@ -370,6 +383,10 @@ int main(void)
                 int val = parse_int(delim, &save_ptr);
                 shoot(idx, val);
             }
+            else if (c == '#')
+            {
+                printk("%f\n", pressure_data.depth);
+            }
         }
 
         alive_state_prev = alive_state;
@@ -381,7 +398,7 @@ int main(void)
         if (pause && k_uptime_get_32() - pause_time > PAUSE_TIME)
         {
             pause = false;
-            motor_time = k_uptime_get_32();
+            motor_time = time_us();
         }
 
         // Kill switch has just been switched from alive to dead. Pause motor
@@ -407,8 +424,7 @@ int main(void)
             attitude.yaw = 0.;
             att_sp.yaw = 0.;
 
-            // TODO: set INITIAL_YAW = current ahrs yaw reading
-            // INITIAL_YAW = 
+            INITIAL_YAW = ahrs_data.yaw;
 
             pos_controller.use_floor_altitude = false;
 
@@ -423,31 +439,52 @@ int main(void)
         // intended.
         if (!pause && alive_state)
         {
-            position.down = pressure_get_depth();
+            position.down = pressure_data.depth;
 
-            // Todo: implement ahrs sampling here
+            angvel.roll_rad_s = ahrs_data.ang_vel_roll;
+            angvel.pitch_rad_s = ahrs_data.ang_vel_pitch;
+            angvel.yaw_rad_s = ahrs_data.ang_vel_yaw;
 
-            // angvel.roll_rad_s = ahrs_get_roll_rad_s()
-            // angvel.pitch_rad_s = ahrs_get_pitch_rad_s()
-            // angvel.yaw_rad_s = ahrs_get_yaw_rad_s()
-
-            // attitude.yaw = ahrs_get_yaw() - INITIAL_YAW
-            // attitude.pitch = ahrs_get_pitch()
-            // attitude.roll = ahrs_get_roll()
-            // position.altitude = dvl_get_altitude()
+            attitude.yaw = ahrs_data.yaw - INITIAL_YAW;
+            attitude.pitch = ahrs_data.pitch;
+            attitude.roll = ahrs_data.roll;
           
             // Handle angle overflow/underflow.
             attitude.yaw += (attitude.yaw > M_PI) ? -2*M_PI : (attitude.yaw < -M_PI) ? 2*M_PI : 0;
             attitude.pitch += (attitude.pitch > M_PI) ? -2*M_PI : (attitude.pitch < -M_PI) ? 2*M_PI : 0;
             attitude.roll += (attitude.roll > M_PI) ? -2*M_PI : (attitude.roll < -M_PI) ? 2*M_PI : 0;
 
+            if (fabs(dvl_data.velocity_x < 5.))
+                velocity_body.forward_m_s = dvl_data.velocity_x;
+            else
+                velocity_body.forward_m_s = 0.;
+            if (fabs(dvl_data.velocity_y < 5.))
+                velocity_body.right_m_s = dvl_data.velocity_y;
+            else 
+                velocity_body.right_m_s = 0.;
+            if (fabs(dvl_data.velocity_z < 5.))
+                velocity_body.down_m_s = dvl_data.velocity_z;
+            else 
+                velocity_body.down_m_s = 0.;
+            position.altitude = dvl_data.altitude;
+
+
             // Update our position based on velocity and time elapsed
-            uint32_t t = k_uptime_get_32();
-            float dt = (t - motor_time) / 1000.;
+            uint32_t t = time_us();
+            float dt = (t - motor_time) / 1e6f;
             motor_time = t;
 
-            mec_vehicle_position_update(&velocity_body,
-                position.altitude, &position, &attitude, dt);
+            struct mec_vehicle_velocity rectified_velocity;
+            velocity_body_to_ned(&velocity_body, &rectified_velocity, &attitude);
+
+            float abs_dx = rectified_velocity.north_m_s * dt;
+            float abs_dy = rectified_velocity.east_m_s * dt;
+            if (fabs(abs_dx) < 0.5)
+                position.north += abs_dx;
+            if (fabs(abs_dy) < 0.5)
+                position.east += abs_dy;
+            //mec_vehicle_position_update(&velocity_body,
+            //    position.altitude, &position, &attitude, dt);
 
             // Compute thruster outputs from error in current state to state setpoint
             if (!angvel_override)
@@ -494,9 +531,11 @@ int main(void)
             // Map forces and torques to thruster outputs
             float thruster_outputs[8];
             mec_mix(&force_out, &torque_out, mix, power, thruster_outputs);
-
-            // TODO: interface with thrusters to send them the thruster_outputs
-            send_thrusts(thruster_outputs); // for example
+            send_thrusts(thruster_outputs); 
         }
+        
+        // Sleep so other sensor reading threads can run
+        k_sleep(K_MSEC(20));
     }
 }
+

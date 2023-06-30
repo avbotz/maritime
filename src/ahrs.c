@@ -1,103 +1,261 @@
-// #include <stdio.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
+#include <stdlib.h>
 
-// #include <zephyr.h>
-// #include <device.h>
-// #include <drivers/gpio.h>
-// #include <drivers/uart.h>
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/sys/ring_buffer.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/timing/timing.h>
 
-// #include <logging/log.h>
-// #include "threads.h"
+#include "ahrs.h"
+#include "util.h"
 
-// #include "ahrs.h"
+LOG_MODULE_REGISTER(uart_ahrs, LOG_LEVEL_INF);
 
-// LOG_MODULE_REGISTER(ahrs, LOG_LEVEL_DBG);
+#define UART2_DEVICE_NODE DT_NODELABEL(uart4)
 
-// //Function to sample data directly from imu
-// int sample_imu(const struct device *dev, struct imu_sample *imu_sample)
-// {
-// 	int64_t = time_now = k_uptime_get();
-// 	struct sensor_value accel, gyro, temperature, magn, att;
+static const struct device *uart_device = DEVICE_DT_GET(UART2_DEVICE_NODE);
 
-// 	int ret;
-// 	ret = sensor_sample_fetch(dev);
-// 	if (ret != 0) goto end;
+K_MSGQ_DEFINE(ahrs_data_msgq, sizeof(struct ahrs_data_s), 1, 4);
 
-// 	ret = sensor_channel_get(dev, SENSOR_CHAN_ACCEL_XYZ, &accel);
-// 	if (ret != 0) goto end;
-// 	ret = sensor_channel_get(dev, SENSOR_CHAN_GYRO_XYZ, &gyro);
-// 	if (ret != 0) goto end;
-//   ret = sensor_channel_get(dev, SENSOR_CHAN_AMBIENT_TEMP, &temperature);
-// 	if (ret != 0) goto end;
+K_SEM_DEFINE(ahrs_rx_frame_buf_sem, 0, 1);
 
-//   imu_sample->timestamp = time_now;
-// 	imu_sample->gyro[0] = sensor_value_to_double(&gyro[0]);
-// 	imu_sample->gyro[1] = sensor_value_to_double(&gyro[1]);
-// 	imu_sample->gyro[2] = sensor_value_to_double(&gyro[2]);
-// 	imu_sample->accel[0] = sensor_value_to_double(&accel[0]);
-// 	imu_sample->accel[1] = sensor_value_to_double(&accel[1]);
-// 	imu_sample->accel[2] = sensor_value_to_double(&accel[2]);
-// 	imu_sample->temperature = sensor_value_to_double(&temperature);
+// Total bytes the message can store
+#define MSG_SZ 512
 
-// end:
-// 	return ret;
-// }
+// #include <pubsub/pubsub.h>
 
-// //Function to sample data directly from magnetometer
-// int sample_mag(const struct device *dev, struct mag_sample *mag_sample){
-// 	int64_t = time_now = k_uptime_get();
-// 	struct sensor_value mag;
+#define NS_ELAPSED(time_a, time_b) (timing_cycles_to_ns(timing_cycles_get(&time_a, &time_b)))
 
-// 	int ret;
-// 	ret = sensor_sample_fetch(dev);
-// 	if (ret != 0) goto end;
+RING_BUF_DECLARE_STATIC(ring_buf_tx, MSG_SZ);
+RING_BUF_DECLARE_STATIC(ring_buf_rx, MSG_SZ);
 
-// 	ret = sensor_channel_get(dev, SENSOR_CHAN_MAGN_XYZ, &magn);
-// 	if (ret != 0) goto end;
+static uint8_t buf[MSG_SZ];
 
-//   imu_sample->timestamp = time_now;
-// 	imu_sample->magn[0] = sensor_value_to_double(&magn[0]);
-// 	imu_sample->magn[1] = sensor_value_to_double(&magn[1]);
-// 	imu_sample->magn[2] = sensor_value_to_double(&magn[2]);
-// }
+timing_t t = 0, a, b, c;
 
-// static const struct device *get_icm20689_device(void)
-// {
-// 	const struct device *const dev = GPIO_DT_SPEC_GET(IMU_NODE, gpios);
+bool seen_start = false;
 
-// 	if (dev == NULL) {
-// 		/* No such node, or the node does not have status "okay". */
-// 		printk("\nError: no device found.\n");
-// 		return NULL;
-// 	}
+const uint8_t start_byte = 'w';
 
-// 	if (!device_is_ready(dev)) {
-// 		printk("\nError: IMU \"%s\" is not ready; "
-// 		       "check the driver initialization logs for errors.\n",
-// 		       dev->name);
-// 		return NULL;
-// 	}
 
-// 	printk("Found IMU \"%s\", getting sensor data\n", dev->name);
-// 	return dev;
-// }
+const float TO_RAD = M_PI / 180.0f;
+const float TO_RAD_S = TO_RAD * 1e6f;
 
-// static const struct device *get_rm3100_device(void)
-// {
-// 	const struct device *const dev = GPIO_DT_SPEC_GET(MAG_NODE, gpios);
+uint32_t tt; 
 
-// 	if (dev == NULL) {
-// 		/* No such node, or the node does not have status "okay". */
-// 		printk("\nError: no device found.\n");
-// 		return NULL;
-// 	}
+uint32_t prev_time = 0;
+struct ahrs_data_s prev_sample = {
+    .yaw   = 0,
+    .pitch = 0,
+    .roll  = 0
+};
 
-// 	if (!device_is_ready(dev)) {
-// 		printk("\nError: magnetometer \"%s\" is not ready; "
-// 		       "check the driver initialization logs for errors.\n",
-// 		       dev->name);
-// 		return NULL;
-// 	}
+int process(char *buf, struct ahrs_data_s *ahrs_data) {
+    LOG_DBG("Received update: %s", buf);
+    char *str = buf;
+    char *end;
+    
+    uint32_t cur_time = time_us();
 
-// 	printk("Found magnetometer \"%s\", getting sensor data\n", dev->name);
-// 	return dev;
-// }
+    uint32_t timestamp = (uint32_t)strtol(str, &end, 10);
+    if (timestamp == 0) return -1;
+    str = ++end;
+    tt = timestamp;
+
+    uint8_t sensor_id = (uint8_t)strtol(str, &end, 10); 
+    if (sensor_id != 3 || sensor_id == 0) return -1;
+    str = ++end;
+
+    ahrs_data->yaw = strtof(str, &end) * TO_RAD;
+    if (fabs(ahrs_data->yaw) > 360.) return -1;
+    str = ++end;
+
+    ahrs_data->pitch = -strtof(str, &end) * TO_RAD;
+    if (ahrs_data->pitch == 0) return -1;
+    str = ++end;
+
+    ahrs_data->roll = -strtof(str, &end) * TO_RAD;
+    if (ahrs_data->roll == 0) return -1;
+    str = ++end;
+
+    float accuracy = strtof(str, &end);
+    if (accuracy == 0) return -1;
+
+    ahrs_data->ang_vel_yaw   = (ahrs_data->yaw - prev_sample.yaw) / (cur_time - prev_time) * 1e6f;
+    ahrs_data->ang_vel_pitch = (ahrs_data->pitch - prev_sample.pitch) / (cur_time - prev_time) * 1e6f;
+    ahrs_data->ang_vel_roll  = (ahrs_data->roll - prev_sample.roll) / (cur_time - prev_time) * 1e6f;
+    
+    LOG_DBG("Timestamp: %u\n\rYaw: %f, Pitch: %f, Roll: %f\n\rdt: %u, Vyaw: %f, Vpitch: %f, Vroll: %f",
+            timestamp,
+            ahrs_data->yaw,
+            ahrs_data->pitch,
+            ahrs_data->roll,
+            cur_time - prev_time,
+            ahrs_data->ang_vel_yaw,
+            ahrs_data->ang_vel_pitch,
+            ahrs_data->ang_vel_roll);
+
+    timing_t cur = timing_counter_get();
+    uint64_t el = NS_ELAPSED(t, cur);
+    LOG_DBG("%llu ns", el);
+    t = cur;
+
+    prev_time = cur_time;
+    memcpy(&prev_sample, ahrs_data, sizeof(struct ahrs_data_s));
+
+    return 0;
+}
+
+
+void process_frame() {
+    while (true) {
+        if (k_sem_take(&ahrs_rx_frame_buf_sem, K_MSEC(100)) != 0) {
+            LOG_DBG("AHRS frame rx buffer sem exceeded 100 msec timeout");
+            k_yield();
+            continue;
+        } 
+
+        uint8_t rx_byte;
+        // uint32_t rb_len;
+
+        uint64_t c0 = timing_counter_get();
+        // Ensure ring buf starts at frame start
+        while (true) {
+            ring_buf_peek(&ring_buf_rx, &rx_byte, 1);
+            if (rx_byte != start_byte) {
+                ring_buf_get(&ring_buf_rx, &rx_byte, 1);
+                // printk("misaligned frame, continuing to retrieve data %c\r\n", rx_byte);
+                // LOG_INF("Misaligned frame with char %c\r\n", rx_byte);
+            } else {
+                break;
+            }
+        }
+
+        // Get ring buf data till frame end byte
+        // TODO: implement checksum before continuing processing
+        uint32_t len = 0;
+        while (true) {
+            if (len == MSG_SZ) {
+                return;
+            }
+
+            ring_buf_get(&ring_buf_rx, &rx_byte, 1);
+
+            if (rx_byte == 'w') {
+                continue;
+            }
+            if (rx_byte == '\r') {
+                break;
+            }
+
+            *(buf + len) = rx_byte;
+            ++len;
+        }
+        
+        buf[len] = '\0'; 
+        
+        // printk("received total frame: %s\n", buf);
+        
+        c = timing_counter_get();
+        LOG_DBG("Claim time: %llu ns", NS_ELAPSED(c0, c));
+         // LOG_DBG("Claim time (with sem): %llu ns", NS_ELAPSED(b, c));
+
+        struct ahrs_data_s ahrs_data;
+        
+        int ret = process(buf, &ahrs_data);
+
+        if (ret == 0) {
+            while (k_msgq_put(&ahrs_data_msgq, &ahrs_data, K_NO_WAIT) != 0) {
+                k_msgq_put(&ahrs_data_msgq, &ahrs_data, K_NO_WAIT);
+            }
+        }
+        // LOG_DBG("Timestamp: %u", tt);
+        k_yield();
+    }
+}
+
+void uart_tx_msg(char *msg){
+    LOG_DBG("Sending AHRS MSG: %s", msg);
+    ring_buf_put(&ring_buf_tx, msg, strlen(msg));
+    uart_irq_tx_enable(uart_device);
+}
+
+
+static void uart_irq_callback(const struct device *dev, void *data) {
+    ARG_UNUSED(dev);
+    ARG_UNUSED(data);
+
+    // uint8_t rx[3] = "000";
+    // uint8_t pos = -1;
+    while (uart_irq_update(uart_device) && uart_irq_is_pending(uart_device)) {
+
+        if (uart_irq_tx_complete(uart_device) && ring_buf_is_empty(&ring_buf_tx)){
+            uart_irq_tx_disable(uart_device);
+        }
+
+        uint8_t tx_byte;
+        if (uart_irq_tx_ready(uart_device)){
+            ring_buf_get(&ring_buf_tx, &tx_byte, 1);
+            uart_fifo_fill(uart_device, &tx_byte, 1);
+        }
+
+        uint8_t rx_byte;
+        if (uart_irq_rx_ready(uart_device)) {
+            // printk("%c", rx_byte);
+            uart_fifo_read(uart_device, &rx_byte, 1);
+            ring_buf_put(&ring_buf_rx, &rx_byte, 1);
+
+            if (rx_byte == '\r') {
+                if (!seen_start) {
+                    seen_start = true;
+                    a = timing_counter_get();
+                    ring_buf_put(&ring_buf_rx, &start_byte, 1);
+                } else {
+                    seen_start = false;
+                    b = timing_counter_get();
+                    k_sem_give(&ahrs_rx_frame_buf_sem);
+                    // LOG_DBG("Get: %llu ns", NS_ELAPSED(a, b));
+                }
+            } 
+
+            // echo back byte
+            // ring_buf_put(&ring_buf_tx, &rx_byte, 1);
+            // uart_irq_tx_enable(uart_device);
+        }
+    }
+
+}
+
+int setup_ahrs() {
+    LOG_DBG("Setting up AHRS");
+    if (!device_is_ready(uart_device)) {
+        return -1;
+    }
+
+    uart_irq_callback_user_data_set(uart_device, uart_irq_callback, NULL);
+    uart_irq_rx_enable(uart_device);
+
+    uart_tx_msg("X");
+    k_sleep(K_MSEC(1000));
+    uart_tx_msg("M1\r");
+    uart_tx_msg("m0");
+    uart_tx_msg("V0");
+    uart_tx_msg("s,3," STR(AHRS_OUTPUT_RATE) "\r");
+
+    prev_time = time_us();
+
+    LOG_DBG("Finished setting up AHRS");
+
+    return 0; 
+}
+
+
+K_THREAD_DEFINE(ahrs_rx_frame_handle_thread_id, 4096,
+                process_frame, NULL, NULL, NULL,
+                K_LOWEST_APPLICATION_THREAD_PRIO, 0, 0);

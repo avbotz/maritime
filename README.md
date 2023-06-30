@@ -16,8 +16,8 @@ cd maritime
 
 ```sh
 ./compile.sh (local compile)
-west flash   (flashes microcontroller)
 ./comms.sh   (init serial communication)
+west flash   (flashes microcontroller)
 ```
 
 ## Startup

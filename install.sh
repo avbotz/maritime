@@ -15,6 +15,9 @@ sudo apt install --no-install-recommends git cmake ninja-build gperf \
   python3-dev python3-pip python3-setuptools python3-tk python3-wheel xz-utils file \
   make gcc gcc-multilib g++-multilib libsdl2-dev libmagic1 stlink-tools
 
+# Add the maritime_ec library
+git clone https://github.com/avbotz/maritime_ec.git
+
 pip3 install --user -U west
 echo 'export PATH=~/.local/bin:"$PATH"' >> ~/.bashrc
 source ~/.bashrc

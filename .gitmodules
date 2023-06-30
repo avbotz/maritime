@@ -1,3 +1,0 @@
-[submodule "extern/maritime_ec"]
-	path = extern/maritime_ec
-	url = https://github.com/avbotz/maritime_ec.git

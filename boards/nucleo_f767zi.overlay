@@ -1,10 +1,3 @@
-/* Ask chatgpt if u don't understand some of this stuff */
-
-/*
- * Communicate with the servos (that control dropper, grabber, shooter)
- * via pwm
- */
-
 / {
     /* Grabber and shooter servos are ser-110x model */
     dropper_servo: dropper_servo {
@@ -65,7 +58,6 @@
     };
 };
 
-/* Communicate with DVL via uart */
 &uart5 {
     pinctrl-0 = <&uart5_tx_pb9 &uart5_rx_pb8>;
     pinctrl-names = "default";
@@ -74,15 +66,26 @@
 };
 
 &usart1 {
-    pinctrl-0 = <&usart1_tx_pb6 &usart1_rx_pa10>;
+    pinctrl-0 = <&usart1_tx_pa9 &usart1_rx_pa10>;
     pinctrl-names = "default";
     current-speed = <115200>;
     status = "okay";
 };
 
-/* Communicate with AHRS via uart */
+&usart2 {
+    pinctrl-0 = <&usart2_tx_pd5 &usart2_rx_pd6>;
+    pinctrl-names = "default";
+    current-speed = <115200>;
+    status = "okay";
+};
 
-/* Communicate with pressure sensor via i2c */
+&uart4 {
+    pinctrl-0 = <&uart4_tx_pc10 &uart4_rx_pc11>;
+    pinctrl-names = "default";
+    current-speed = <115200>;
+    status = "okay";
+};
+
 &i2c1 {
     status = "disabled";
 };
@@ -98,14 +101,14 @@
     };
 };
 
-/* Communicate with thrusters via CAN */
+
 /*
 can1 already enabled, alias zephyr,canbus = &can1;
 
 &can1 {
-    pinctrl-0 = <&can1_rx_pd0 &can1_tx_pd1>;
-    pinctrl-names = "default";
-    bus-speed = <125000>;
-    status = "okay";
+	pinctrl-0 = <&can1_rx_pd0 &can1_tx_pd1>;
+	pinctrl-names = "default";
+	bus-speed = <125000>;
+	status = "okay";
 };
 */
