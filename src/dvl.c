@@ -18,7 +18,7 @@
 
 LOG_MODULE_REGISTER(test_dvl, LOG_LEVEL_INF);
 
-#define UART5_DEVICE_NODE DT_NODELABEL(uart5)
+#define UART5_DEVICE_NODE DT_NODELABEL(usart2)
 
 static const struct device *uart_device = DEVICE_DT_GET(UART5_DEVICE_NODE);
 

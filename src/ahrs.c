@@ -17,7 +17,7 @@
 
 LOG_MODULE_REGISTER(uart_ahrs, LOG_LEVEL_INF);
 
-#define UART2_DEVICE_NODE DT_NODELABEL(uart4)
+#define UART2_DEVICE_NODE DT_NODELABEL(usart1)
 
 static const struct device *uart_device = DEVICE_DT_GET(UART2_DEVICE_NODE);
 

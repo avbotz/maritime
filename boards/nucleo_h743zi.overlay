@@ -1,15 +1,10 @@
-/* Ask chatgpt if u don't understand some of this stuff */
-
-/* 
- * Communicate with the servos (that control dropper, grabber, shooter) 
- * via pwm 
- */
+/* Ask chatgpt if u don't understand something */
 
 / {
-    /* Dropper and shooter servos are ser-110x model */
+    /* Grabber and shooter servos are ser-110x model */
     dropper_servo: dropper_servo {
         compatible = "pwm-servo";
-        pwms = <&pwm1 1 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        pwms = <&pwm1_custom 1 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
         min-pulse = <PWM_USEC(850)>;
         max-pulse = <PWM_USEC(2220)>; /* This sus value works */
     };
@@ -30,11 +25,11 @@
     };
 };
 
-/* 
- * Map ports to their respective timers: https://github.com/micropython/micropython/blob/master/ports/stm32/boards/stm32f767_af.csv
+/* Define timers for the pwm; pwm1 is already defined on pin pe13 by default
+ * in zephyr's Nucleo f767zi dts file on their github.
  */
 &timers2{
-    pwm1: pwm {
+    pwm1_custom: pwm {
         status = "okay";
         pinctrl-0 = <&tim2_ch1_pa0>;
         pinctrl-names = "default";
@@ -45,21 +40,19 @@
         pinctrl-0 = <&tim2_ch2_pa1>;
         pinctrl-names = "default";
     };
-};
-
-&timers4{
-    st,prescaler = <10000>;
-    status = "okay";
 
     pwm3: pwm {
         status = "okay";
-        pinctrl-0 = <&tim4_ch3_pd14>;
+        pinctrl-0 = <&tim2_ch3_pa2>;
         pinctrl-names = "default";
     };
 };
 
-
-/* Communicate with the killswitch as a gpio "button" on pin PH1 */
+/* 
+ * Communicate with the killswitch as a gpio "button" on pin PH1 
+ * Communicate with the DVL switch (that connects DVL's wires to 
+ *   nucleos uart pins) on pin PA14
+ */
 / {
     buttons {
         compatible = "gpio-keys";
@@ -68,10 +61,15 @@
             gpios = <&gpioh 1 GPIO_ACTIVE_HIGH>;
             label = "Killswitch modeled as a button";
         };
-    };  
+
+        dvl_switch: dvl_switch {
+            /* Pin PA14 -> gpioa 14 */
+            gpios = <&gpioa 14 GPIO_ACTIVE_HIGH>;
+            label = "DVL switch that connects DVL wires to nucleos pins.";
+        };
+    };
 };
 
-/* Communicate with DVL via uart */
 &uart4 {
     pinctrl-0 = <&uart4_tx_pb9 &uart4_rx_pb8>;
     pinctrl-names = "default";
@@ -79,15 +77,20 @@
     status = "okay";
 };
 
-/* Communicate with AHRS via uart */
 &usart1 {
-    pinctrl-0 = <&usart1_tx_pb6 &usart1_rx_pa10>;
+    pinctrl-0 = <&usart1_tx_pa9 &usart1_rx_pa10>;
     pinctrl-names = "default";
     current-speed = <115200>;
     status = "okay";
 };
 
-/* Communicate with pressure sensor via i2c */
+&usart2 {
+    pinctrl-0 = <&usart2_tx_pd5 &usart2_rx_pd6>;
+    pinctrl-names = "default";
+    current-speed = <115200>;
+    status = "okay";
+};
+
 &i2c1 {
     status = "disabled";
 };
@@ -103,7 +106,7 @@
     };
 };
 
-/* Communicate with thrusters via CAN */
+
 /*
 can1 already enabled, alias zephyr,canbus = &can1;
 
