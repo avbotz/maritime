@@ -11,7 +11,6 @@
 K_MSGQ_DEFINE(pressure_data_msgq, sizeof(struct pressure_data_s), 1, 4);
 LOG_MODULE_REGISTER(test_pressure, LOG_LEVEL_INF);
 
-static const struct device *const dev = DEVICE_DT_GET_ANY(meas_ms5837);
 
 int setup_pressure() {
 /*    static struct sensor_value oversampling_rate = { 8192, 0 };
@@ -43,7 +42,8 @@ void pressure_thread(void *arg1, void *arg2, void *arg3){
 
     LOG_DBG("Started pressure thread");
     static const struct device *const dev = DEVICE_DT_GET_ANY(meas_ms5837);
-    LOG_DBG("Got pressure dev");
+    static struct sensor_value oversampling_rate = { 8192, 0 };
+
     if (dev == NULL) {
         LOG_ERR("Could not find MS5837 device, aborting test.");
         return;
@@ -54,20 +54,22 @@ void pressure_thread(void *arg1, void *arg2, void *arg3){
         return;
     }
 
-/*    if (sensor_attr_set(dev, SENSOR_CHAN_ALL, SENSOR_ATTR_OVERSAMPLING,
+    if (sensor_attr_set(dev, SENSOR_CHAN_ALL, SENSOR_ATTR_OVERSAMPLING,
                 &oversampling_rate) != 0) {
         LOG_ERR("Could not set oversampling rate of %d "
                 "on MS5837 device, aborting test.",
                 oversampling_rate.val1);
         return;
-    }*/
+    }
+
+    struct sensor_value press;
+    int ret;
+    float pressure_sample;
+    struct pressure_data_s pressure_data;
 
 
     while (1) {
-        LOG_DBG("Entered pressure thread");
-        struct sensor_value press;
-
-        int ret = sensor_sample_fetch(dev);
+        ret = sensor_sample_fetch(dev);
         if (ret != 0) {
             LOG_DBG("Fetch error %d", ret);
             continue;
@@ -78,15 +80,13 @@ void pressure_thread(void *arg1, void *arg2, void *arg3){
             continue;
         }
 
-	float pressure_sample = press.val1 + press.val2 * pow(10, -6);
-
-        struct pressure_data_s pressure_data;
-	pressure_data.depth = (pressure_sample - 5.123) * 1.997;
+		pressure_sample = press.val1 + press.val2 * pow(10, -6);
+		pressure_data.depth = (pressure_sample - 5.123) * 1.997;
         while (k_msgq_put(&pressure_data_msgq, &pressure_data, K_NO_WAIT) != 0) {
             k_msgq_put(&pressure_data_msgq, &pressure_data, K_NO_WAIT);
         }
         LOG_DBG("Pressure reading: %f", pressure_sample);
-        // k_yield();
+        k_sleep(K_MSEC(100));
         // LOG_DBG("Back in pressure thread");
     }
 }
@@ -95,4 +95,4 @@ void pressure_thread(void *arg1, void *arg2, void *arg3){
 K_THREAD_DEFINE(pressure_thread_id, 2048,
                 pressure_thread, NULL, NULL, NULL,
                 K_LOWEST_APPLICATION_THREAD_PRIO, 0, 0);
-*/
+                */
