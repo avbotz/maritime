@@ -46,7 +46,11 @@
     };
 };
 
-/* Communicate with the killswitch as a gpio "button" on pin PH1 */
+/* 
+ * Communicate with the killswitch as a gpio "button" on pin PH1 
+ * Communicate with the DVL switch (that connects DVL's wires to 
+ *   nucleo's uart pins) on pin PA14
+ */
 / {
     buttons {
         compatible = "gpio-keys";
@@ -54,6 +58,12 @@
             /* Pin PH1 -> gpioh 1 */
             gpios = <&gpioh 1 GPIO_ACTIVE_HIGH>;
             label = "Killswitch modeled as a button";
+        };
+
+        dvl_switch: dvl_switch {
+            /* Pin PA14 -> gpioa 14 */
+            gpios = <&gpioa 14 GPIO_ACTIVE_HIGH>;
+            label = "DVL switch that connects DVL wires to nucleo's pins.";
         };
     };
 };

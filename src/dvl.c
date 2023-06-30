@@ -14,12 +14,16 @@
 
 #include "dvl.h"
 #include "util.h"
+#include <zephyr/drivers/gpio.h>
 
 LOG_MODULE_REGISTER(test_dvl, LOG_LEVEL_INF);
 
 #define UART5_DEVICE_NODE DT_NODELABEL(uart5)
 
 static const struct device *uart_device = DEVICE_DT_GET(UART5_DEVICE_NODE);
+
+static const struct gpio_dt_spec dvl_switch = 
+    GPIO_DT_SPEC_GET(DT_NODELABEL(dvl_switch), gpios);
 
 // upper bound of length of a single packet
 #define DVL_MSG_MAX_SZ 512
@@ -299,10 +303,37 @@ void dvl_packet_handle_thread(void) {
     }
 }
 
+void setup_dvl_uart_switch()
+{
+    gpio_pin_configure_dt(&dvl_switch, GPIO_OUTPUT);
+
+    // Have the dvl uart wires not connected to nucleo by default because
+    // the waterlinked a50 dvl sends a 5v spike on powerup that can brick the nucleo pins
+    stop_dvl_uart();
+}
+
 void setup_dvl(void) {
     LOG_DBG("Setting up DVL");
     uart_irq_callback_user_data_set(uart_device, uart_irq_callback, NULL);
     uart_irq_rx_enable(uart_device);
+    setup_dvl_uart_switch();
+}
+
+/* 
+ * Flips on or separates the relay switch to connect the dvl's uart wires to the nucleo's pins.
+ * Is necessary to have the switch off by default b/c the waterlinked a50 dvl
+ * initially sends a 10 microsecond 5v spike on power up which can brick the uart pin. 
+ * Only flip the switch on when the dvl has finished powering up for sure.
+ */
+
+void start_dvl_uart()
+{
+    gpio_pin_set_dt(&dvl_switch, 1);
+}
+
+void stop_dvl_uart()
+{
+    gpio_pin_set_dt(&dvl_switch, 0);
 }
 
 K_THREAD_DEFINE(dvl_thread_id, 4096,

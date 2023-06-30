@@ -14,6 +14,10 @@ struct dvl_data_s {
 
 void setup_dvl(void);
 
+void start_dvl_uart();
+
+void stop_dvl_uart();
+
 extern struct k_msgq dvl_data_msgq;
 
 #endif

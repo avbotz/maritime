@@ -149,7 +149,8 @@ int main(void)
     bool ahrs_updated = false;
     bool pressure_updated = false;
 
-    while (true) {
+    while (true) 
+    {
         int ret;
         ret = k_msgq_get(&ahrs_data_msgq, &ahrs_data, K_NO_WAIT);
         ret = k_msgq_get(&dvl_data_msgq, &dvl_data, K_NO_WAIT);
@@ -406,6 +407,7 @@ int main(void)
         // these "if" statements will run.
         if (alive_state_prev && !alive_state)
         {
+            stop_dvl_uart();
             // TODO: send thrust values of 0 here in case 
             // the power doesn't shut off?
         }
@@ -415,6 +417,8 @@ int main(void)
         // time to start up. 
         if (!alive_state_prev && alive_state)
         { 
+            start_dvl_uart();
+
             position.north = 0.;
             position.east = 0.;
             position_sp.north = 0.;
