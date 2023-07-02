@@ -388,6 +388,15 @@ int main(void)
             {
                 printk("%f\n", pressure_data.depth);
             }
+	    // Debug characters to test the dvl switch
+	    else if (c == 'q')
+	    {
+		start_dvl_uart();
+	    }
+	    else if (c == 'j')
+	    {
+	        stop_dvl_uart();
+	    }
         }
 
         alive_state_prev = alive_state;

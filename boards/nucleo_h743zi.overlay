@@ -63,8 +63,8 @@
         };
 
         dvl_switch: dvl_switch {
-            /* Pin PA14 -> gpioa 14 */
-            gpios = <&gpioa 14 GPIO_ACTIVE_HIGH>;
+            /* Pin PG7 -> gpiog 7 */
+            gpios = <&gpiog 7 GPIO_ACTIVE_HIGH>;
             label = "DVL switch that connects DVL wires to nucleos pins.";
         };
     };

@@ -328,11 +328,13 @@ void setup_dvl(void) {
 
 void start_dvl_uart()
 {
+    LOG_DBG("Started dvl switch");
     gpio_pin_set_dt(&dvl_switch, 1);
 }
 
 void stop_dvl_uart()
 {
+    LOG_DBG("Stopped dvl switch");
     gpio_pin_set_dt(&dvl_switch, 0);
 }
 
