@@ -98,7 +98,7 @@ uint64_t last_seen = 0, diff = 0;
 static void uart_irq_callback(const struct device *dev, void *data) {
     ARG_UNUSED(dev);
     ARG_UNUSED(data);
-
+    
     struct dvl_packet_s dvl_packet; 
 
     while (uart_irq_update(uart_device) && uart_irq_is_pending(uart_device)) {
@@ -264,8 +264,8 @@ void dvl_packet_handle_thread(void) {
     int ret;
 
     while (true) {
-
-        uint64_t a = timing_counter_get();
+        
+	uint64_t a = timing_counter_get();
         ret = k_msgq_get(&dvl_packet_msgq, &dvl_packet, K_NO_WAIT);
         if (ret != 0)
         {
