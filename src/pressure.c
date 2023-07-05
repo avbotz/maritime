@@ -100,8 +100,9 @@ void pressure_thread(void *arg1, void *arg2, void *arg3){
 	        }
 	        LOG_DBG("Pressure reading: %f", pressure_sample);
     	}
-        k_sleep(K_MSEC(100));
+        k_sleep(K_MSEC(50));
     }
+    return;
 }
 
 K_THREAD_DEFINE(pressure_thread_id, 4096,

@@ -120,6 +120,9 @@ int main(void)
     position_sp.down = 0;
     position_controller_update_sp(&pos_controller, &position_sp);
 
+    attitude.yaw = 0;
+    attitude.pitch = 0;
+    attitude.roll = 0;
     att_sp.yaw = 0;
     att_sp.pitch = 0;
     att_sp.roll = 0;
@@ -310,7 +313,10 @@ int main(void)
             }
             else if (c == 'h')
             {
-                printk("%f\n", rad_to_deg(ahrs_data.yaw));
+                printk("%f %f %f\n", 
+		    rad_to_deg(ahrs_data.yaw),
+		    rad_to_deg(ahrs_data.pitch),
+		    rad_to_deg(ahrs_data.roll));
             }
             else if (c == 'd')
             {
@@ -437,12 +443,19 @@ int main(void)
             attitude.yaw = 0.;
             att_sp.yaw = 0.;
 
+	    angvel_sp.yaw_rad_s = 0;
+	    angvel_sp.pitch_rad_s = 0;
+	    angvel_sp.roll_rad_s = 0;
+
             INITIAL_YAW = ahrs_data.yaw;
 
             pos_controller.use_floor_altitude = false;
 
             pause = true;
             pause_time = k_uptime_get_32();
+
+	    velocity_override = false;
+	    angvel_override = false;
 
             position_controller_update_sp(&pos_controller, &position_sp);
             att_controller_update_sp(&attitude_controller, &att_sp);
@@ -550,5 +563,6 @@ int main(void)
         // Sleep so other sensor reading threads can run
         k_sleep(K_MSEC(20));
     }
+    return 0;
 }
 

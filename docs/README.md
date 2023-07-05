@@ -46,12 +46,18 @@ With necessary flags that its device initialization would need.
 
 * We use the [Waterlinked A-50 DVL](https://waterlinked.github.io/dvl/dvl-a50/). Its [Baud Rate](https://en.wikipedia.org/wiki/Baud) is 115200.
 
-* The DVL sends data to the microcontroller (currently [STM32 Nucleo F767ZI](https://docs.zephyrproject.org/latest/boards/arm/nucleo_f767zi/doc/index.html)) through UART.
+* The DVL sends data to the microcontroller (currently [STM32 Nucleo H743ZI](https://docs.zephyrproject.org/latest/boards/arm/nucleo_h743zi/doc/index.html)) through UART.
 
-* The serial protocol for the A-50 can be found [here](https://waterlinked.github.io/dvl/dvl-protocol/#serial-protocol). We are primarily interested in the velocity reports, which are sent as a string in the following format:
+* The serial protocol for the A-50 can be found [here](https://waterlinked.github.io/dvl/dvl-protocol/#serial-protocol). We are primarily interested in the velocity reports, which are sent as a string, one character at a time, in the following format:
 ```
 wrz,[vx],[vy],[vz],[valid],[altitude],[fom],[covariance],[time_of_validity],[time_of_transmission],[time],[status]
 ```
+
+## DVL Switch
+
+The problem with the Waterlinked A-50 DVL is that on startup, it sends a 10 microsecond ~5 V spike to the microcontroller's pin, which can brick our pin. To fix this, we have a DVL relay switch, which by default disconnects the microcontroller to the DVL's UART wires. When the sub is unkilled, we assume the spike has passed and we trigger the relay to connect the UART lines. When the sub is killed, we tell the relay to disconnect the lines for safety.
+
+The relay is connected to a GPIO pin on the microcontroller. To trigger the relay, we set that pin to a HIGH state, where the pin sends out a voltage. This causes the relay to connect the DVL UART lines. To turn off the rleay, we set that pin to a LOW state, where the pin does not send voltage. This causes the relay to disconnect the DVL UART lines.
 
 ## AHRS
 * The AHRS, or Attitude and Heading Reference System, consists of a 6-axis IMU and a 3-axis magnetometer. The IMU returns angular velocity and angular acceleration across all 3 axes, and the magnetometer returns the attitude (yaw, pitch, roll).
@@ -80,8 +86,11 @@ wrz,[vx],[vy],[vz],[valid],[altitude],[fom],[covariance],[time_of_validity],[tim
 
 * There are certain pre-defined PWM pins that can be found on the [nucleo's pinout](https://os.mbed.com/platforms/ST-Nucleo-F767ZI/). Each pin has a specific timer and channel that we need to specify in the overlay. We get them from [here](https://github.com/micropython/micropython/blob/master/ports/stm32/boards/stm32f767_af.csv).
 
-## Thrusters  
-TODO
+## Thrusters/ESCS
+
+We send commands to 8 electronic speed controllers (ESCs), which then spin the thrusters. We use the CAN protocol to send these commands.
+
+First, the escs must be configured using the VESC software (ask Kush how to do it). 
 
 
 ## Killswitch

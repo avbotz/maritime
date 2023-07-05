@@ -3,7 +3,7 @@
 
 #include <zephyr/kernel.h>
 
-#define AHRS_OUTPUT_RATE 30 
+#define AHRS_OUTPUT_RATE 50 
 
 int setup_ahrs(void);
 extern struct k_msgq ahrs_data_msgq;

@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
@@ -49,6 +50,37 @@ const float TO_RAD_S = TO_RAD * 1e6f;
 
 uint32_t tt; 
 
+struct Quaternion {
+    double w, x, y, z;
+};
+
+struct EulerAngles {
+    double roll, pitch, yaw;
+};
+
+// this implementation assumes normalized quaternion
+// converts to Euler angles in 3-2-1 sequence
+struct EulerAngles ToEulerAngles(struct Quaternion q) {
+    struct EulerAngles angles;
+
+    // roll (x-axis rotation)
+    double sinr_cosp = 2 * (q.w * q.x + q.y * q.z);
+    double cosr_cosp = 1 - 2 * (q.x * q.x + q.y * q.y);
+    angles.roll = atan2(sinr_cosp, cosr_cosp);
+
+    // pitch (y-axis rotation)
+    double sinp = sqrt(1 + 2 * (q.w * q.y - q.x * q.z));
+    double cosp = sqrt(1 - 2 * (q.w * q.y - q.x * q.z));
+    angles.pitch = 2 * atan2(sinp, cosp) - M_PI / 2;
+
+    // yaw (z-axis rotation)
+    double siny_cosp = 2 * (q.w * q.z + q.x * q.y);
+    double cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
+    angles.yaw = atan2(siny_cosp, cosy_cosp);
+
+    return angles;
+}
+
 uint32_t prev_time = 0;
 struct ahrs_data_s prev_sample = {
     .yaw   = 0,
@@ -60,6 +92,8 @@ int process(char *buf, struct ahrs_data_s *ahrs_data) {
     LOG_DBG("Received update: %s", buf);
     char *str = buf;
     char *end;
+    struct Quaternion quaternion;
+    struct EulerAngles angles;
     
     uint32_t cur_time = time_us();
 
@@ -69,28 +103,48 @@ int process(char *buf, struct ahrs_data_s *ahrs_data) {
     tt = timestamp;
 
     uint8_t sensor_id = (uint8_t)strtol(str, &end, 10); 
-    if (sensor_id != 3 || sensor_id == 0) return -1;
+    if (sensor_id != 15 || sensor_id == 0) return -1;
     str = ++end;
 
-    ahrs_data->yaw = strtof(str, &end) * TO_RAD;
-    if (fabs(ahrs_data->yaw) > 360.) return -1;
+    quaternion.x = strtof(str, &end);
+    if (quaternion.x == 0) return -1;
     str = ++end;
 
-    ahrs_data->pitch = -strtof(str, &end) * TO_RAD;
-    if (ahrs_data->pitch == 0) return -1;
+    quaternion.y = strtof(str, &end);
+    if (quaternion.y == 0) return -1;
     str = ++end;
 
-    ahrs_data->roll = -strtof(str, &end) * TO_RAD;
-    if (ahrs_data->roll == 0) return -1;
+    quaternion.z = strtof(str, &end);
+    if (quaternion.z == 0) return -1;
+    str = ++end;
+
+    quaternion.w = strtof(str, &end);
+    if (quaternion.w == 0) return -1;
     str = ++end;
 
     float accuracy = strtof(str, &end);
-    if (accuracy == 0) return -1;
+
+    angles = ToEulerAngles(quaternion);
+
+    ahrs_data->yaw = -angles.yaw;
+    ahrs_data->pitch = angles.roll;
+    ahrs_data->roll = angles.pitch;
+
+    // Check for nan
+    if (ahrs_data->yaw != ahrs_data->yaw ||
+        ahrs_data->pitch != ahrs_data->pitch ||
+	ahrs_data->roll != ahrs_data->roll)
+	return -1;
 
     ahrs_data->ang_vel_yaw   = (ahrs_data->yaw - prev_sample.yaw) / (cur_time - prev_time) * 1e6f;
     ahrs_data->ang_vel_pitch = (ahrs_data->pitch - prev_sample.pitch) / (cur_time - prev_time) * 1e6f;
     ahrs_data->ang_vel_roll  = (ahrs_data->roll - prev_sample.roll) / (cur_time - prev_time) * 1e6f;
-    
+
+    if (fabs(ahrs_data->ang_vel_yaw) > 3. ||
+        fabs(ahrs_data->ang_vel_pitch) > 3. ||
+	fabs(ahrs_data->ang_vel_roll) > 3.)
+        return -1;
+
     LOG_DBG("Timestamp: %u\n\rYaw: %f, Pitch: %f, Roll: %f\n\rdt: %u, Vyaw: %f, Vpitch: %f, Vroll: %f",
             timestamp,
             ahrs_data->yaw,
@@ -105,7 +159,6 @@ int process(char *buf, struct ahrs_data_s *ahrs_data) {
     uint64_t el = NS_ELAPSED(t, cur);
     LOG_DBG("%llu ns", el);
     t = cur;
-
     prev_time = cur_time;
     memcpy(&prev_sample, ahrs_data, sizeof(struct ahrs_data_s));
 
@@ -246,7 +299,7 @@ int setup_ahrs() {
     uart_tx_msg("M1\r");
     uart_tx_msg("m0");
     uart_tx_msg("V0");
-    uart_tx_msg("s,3," STR(AHRS_OUTPUT_RATE) "\r");
+    uart_tx_msg("s,15," STR(AHRS_OUTPUT_RATE) "\r");
 
     prev_time = time_us();
 

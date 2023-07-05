@@ -397,6 +397,7 @@ void canard_broadcast_thread(void *arg1, void *arg2, void *arg3) {
         k_mutex_unlock(&canard_tx_queue_mutex);
         k_yield();
     }
+    return;
 }
 
 /*
