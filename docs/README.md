@@ -1,5 +1,13 @@
-# Sensors (STM32 Nucleo-F767ZI)
+# Maritime
+Maritime is the code on our microcontroller, which reads data from sensors and controls the thrusters to move the sub to a specific destination. It uses the North-East-Down coordinate system measured in meters and radians (roll pitch yaw order), which is created when the sub is unkilled. This is different from Boops-Boops, which uses degrees instead of radians (yaw pitch roll order). 
+
+# Sensors (STM32 Nucleo-H743ZI)
 Documentation of each sensor in Maritime (our low level control stack), interfaced using Zephyr Project's RTOS.
+
+# Multithreading
+For each sensor, some of them send one character/byte at a time through a wire, which eventually builds up to a string. We have callbacks, which are functions that are called whenever a new character arrives, and they can handle that individual character. However, it's unwise to parse the full string inside the callback because the callback should be as fast/minimal as possible so we don't lose incoming characters. 
+
+Because of this, we use multithreading, or having one thread (process) for each sensor that needs it. We parse the full message inside of the thread, so that it doesn't slow down the callback. The callback usually builds up the full string and then sends it to a message queue, where the thread then handles the parsing.  
 
 ## General Starters for interfacing with a sensor
 * Each sensor should be defined in the overlay file ({board-name}.overlay)
@@ -7,7 +15,7 @@ inside maritime/boards. The overlay goes on top of the [predefined device tree](
 With necessary flags that its device initialization would need.
     For example, for the initialization of the killswitch button, we have defined
     it as a button, with the name label as `killswitch_button`, along with the
-    gpios attribute at the specific pin `PH1` with the flag `GPIO_ACTIVE_HIGH` as
+    gpios attribute at the specific pin `PG4` with the flag `GPIO_ACTIVE_HIGH` as
     shown in the code block below, which is within the overlay file.
     ```
     /* Communicate with the killswitch as a gpio "button" on pin PH1 */
@@ -31,7 +39,7 @@ With necessary flags that its device initialization would need.
     node.
 
 
-* Each sensor is initialized with a init_{sensor} function located in their own
+* Each sensor is initialized with a setup_{sensor} function located in their own
 {sensor}.c file inside maritime/src/
     * You can generally find samples online or through Zephyr Project's basic
     samples (buttons, servos, etc.) in this [repository](https://github.com/zephyrproject-rtos/zephyr/tree/main/samples/basic)
@@ -53,8 +61,9 @@ With necessary flags that its device initialization would need.
 wrz,[vx],[vy],[vz],[valid],[altitude],[fom],[covariance],[time_of_validity],[time_of_transmission],[time],[status]
 ```
 
-## DVL Switch
+* In dvl.c, there is a callback that is called each time a new character arrives to the nucleo. We parse this data by first searching for the first 'wrz' string, then building up the full string one character at a time, until we reach the end of the string, marked by a \r or \n character. Then, we send this string to the dvl thread (process) through a k_msgq (message queue). Once the process receives a new message, it will parse the string, token by token, and it will convert the relevant data strings to floats. Once it finishes parsing the string, it will send the data to another k_msgq, which the loop in the main.c file can access. We use k msg queues because they allow different threads to send data between each other.
 
+## DVL Switch
 The problem with the Waterlinked A-50 DVL is that on startup, it sends a 10 microsecond ~5 V spike to the microcontroller's pin, which can brick our pin. To fix this, we have a DVL relay switch, which by default disconnects the microcontroller to the DVL's UART wires. When the sub is unkilled, we assume the spike has passed and we trigger the relay to connect the UART lines. When the sub is killed, we tell the relay to disconnect the lines for safety.
 
 The relay is connected to a GPIO pin on the microcontroller. To trigger the relay, we set that pin to a HIGH state, where the pin sends out a voltage. This causes the relay to connect the DVL UART lines. To turn off the rleay, we set that pin to a LOW state, where the pin does not send voltage. This causes the relay to disconnect the DVL UART lines.
@@ -62,23 +71,29 @@ The relay is connected to a GPIO pin on the microcontroller. To trigger the rela
 ## AHRS
 * The AHRS, or Attitude and Heading Reference System, consists of a 6-axis IMU and a 3-axis magnetometer. The IMU returns angular velocity and angular acceleration across all 3 axes, and the magnetometer returns the attitude (yaw, pitch, roll).
 
+* Currently, we are only using the gyroscope and accelerometer on the AHRS because the magnetometer (compass) is heavily affected by electromagnetic interference when we are running the thrusters. 
+
+* Maritime uses radians and angular velocity in rad/s where angles are ordered roll pitch yaw, whereas Boops-Boops uses in degrees where angles are ordered yaw pitch roll.  
+
 * We are interested in angular velocity and attitude.
 
-* We use the [Naviguider AHRS](https://www.pnicorp.com/naviguider-modules/), which communicates with the microcontroller over UART.
+* We use the [Naviguider AHRS](https://www.pnicorp.com/naviguider-modules/), which communicates with the microcontroller over UART. See their documentation for the format of the strings they send.
+
+* To read data coming in from the AHRS, the process is similar to that of the DVL, except it parses the AHRS string which has a different format. 
 
 ## Pressure Sensor
-* We use a [Blue Robotics Bar30](https://bluerobotics.com/store/sensors-sonars-cameras/sensors/bar30-sensor-r1/) pressure sensor.
+* We use a [Blue Robotics Bar02](https://bluerobotics.com/store/sensors-cameras/sensors/bar02-sensor-r1-rp/) pressure sensor.
 
-* We use the pressure sensor to find the depth of the submarine.
+* We use the pressure sensor to find the depth of the submarine. Depth in meters = (pressure measured in kPa - air pressure, usually 101.325) / 9.80638.
 
-* The pressure sensor communicates with the microcontroller over the I2C protocol, so we assign it [a pin that is capable of using I2C](https://danieleff.github.io/STM32GENERIC/board_Nucleo_F767ZI/).
+* The pressure sensor communicates with the microcontroller over the I2C protocol, so we assign it [a pin that is capable of using I2C](https://danieleff.github.io/STM32GENERIC/board_Nucleo_H743ZI/).
 
 ## Servos
 * We have three servos on the sub: for the grabber, dropper, and shooter.
 
-* We control the servos with sinusoidal control, meaning we use [PWM](https://www.electronics-tutorials.ws/blog/pulse-width-modulation.html).
+* We control the servos with [PWM signals](https://www.electronics-tutorials.ws/blog/pulse-width-modulation.html).
 
-* Grabber: servo has two modes
+* Grabber: servo has an angular range it can go between to move the grabber
 
 * Dropper: servo has 3 modes: positive, negative, & neutral
 
@@ -87,11 +102,60 @@ The relay is connected to a GPIO pin on the microcontroller. To trigger the rela
 * There are certain pre-defined PWM pins that can be found on the [nucleo's pinout](https://os.mbed.com/platforms/ST-Nucleo-F767ZI/). Each pin has a specific timer and channel that we need to specify in the overlay. We get them from [here](https://github.com/micropython/micropython/blob/master/ports/stm32/boards/stm32f767_af.csv).
 
 ## Thrusters/ESCS
-
 We send commands to 8 electronic speed controllers (ESCs), which then spin the thrusters. We use the CAN protocol to send these commands.
 
-First, the escs must be configured using the VESC software (ask Kush how to do it). 
+First, the escs must be configured using the VESC software (ask Kush how to do it).
 
+They must be assigned IDs that correspond to their location on the sub:
+* Vertical front left    - 0
+* Vertical front right   - 1
+* Vertical back left     - 2
+* Vertical back right    - 3
+* Horizontal front left  - 4
+* Horizontal front right - 5
+* Horizontal back left   - 6
+* Horizontal back right  - 7
+
+The thruster thread continuously sends the latest set of thrust values to the escs, to ensure that the escs keep spinning the thrusters.
 
 ## Killswitch
+
+When the killswitch is flipped, it kills power to the thrusters, killing the sub. When it is unkilled, we are free to run the sub. In main.c, we continuously monitor the status of the killswitch, and when it is unflipped, we begin the loop to send commands to each thruster.
+
+The killswitch connects to a GPIO pin on the nucleo. When the sub is unkilled, there will be no voltage on the pin. When the sub is killed, there will be voltage on the pin. 
+
 Refer to the General Starters section for a general look on interfacing the killswitch.
+
+# Control Loop
+
+Maritime's primary goal is to command the thrusters to move the sub to a coordinate destination (x, y, z, yaw, pitch, roll) that Boops-Boops wants it to move to. It uses a cascade PID controller, where a position controller's output feeds into a velocity controller. 
+
+This is how it does so:
+* Read all the sensors to get the current state of the sub. Multiplying DVL's velocity * dt gives us x and y, pressure sensor gives us z, and AHRS gives us yaw, pitch, roll.
+* Calculate the error between our current state and desired state on each of the 6 axes.
+* Convert that absolute error into relative error on each axis.
+* Feed the relative error on each axis into a pid controllers, which edit those errors. The edited errors become the velocity (m/s) or angular velocity (rad/s) setpoints we want the sub to move at. Essentially, the farther you are from the target, the faster you wanna go.
+* Calculate the error between your current velocity and your desired velocity on each of the 6 axes. These errors are then fed into our velocity pid controllers, which edit those errors. The edited errors then become our force/torque setpoints, one for each of the 6 axes. Essentially, the farther away you are from your desired velocity, the more force you wanna apply. 
+* These force and torque setpoints are values from -1 to 1, where 1 = 100% thruster power. These values are then clamped to be in the range of [-power, power], where power is the proportion of the thruster's power we want to use. Eg. power = 0.6 means the max thruster power we'll use is 60%. Finally, we have a set of forces and torques we want to apply to the sub.
+* Map the forces and torques to how much thrust we should put on each thruster. There is some matrix math, but you can simplify it like so: For each thruster, loop over each axis. If there is error on this axis and the thruster can go in this direction, add thrust to this thruster.
+* Now, you have an array of length 8, with each value being the thrust output in the range [-power, power], one value per thruster. The index of each value in the array is the same as the ID of the esc that the command is sent to. Pass this array to the send_thrusts() function, which sends these thrust values to the escs via the CAN protocol. 
+
+## Depth vs Altitude Control
+
+* The sub can either control depth using the pressure sensor, or altitude using the DVL. We default to controlling depth because it is more consistent and does not depend on the shape of the floor. However, it is possible to control altitude by sending maritime a 'b [DESIRED ALTITUDE' command. (Eg. b 0.5   this makes it go 0.5 altitude, measured from DVL to floor).
+
+## PID Controllers
+
+We use PID controllers to edit the raw position/angle error to optimally control the sub. I recommend watching videos to understand this. 
+
+* The proportional gain multiplies the raw error
+* The integral gain multiplies the area under the error vs. time curve and adds it to the overall error. This builds up error over time and forces the sub to adjust, avoiding steady state error (where the sub is close to a setpoint but refuses to go all the way)
+* The derivative gain multiplies the current slope of the error vs. time curve and adds it to the overall error. This has the effect where if your error is decreasing, this is a negative slope, so you have less response and are less aggressive as you approach the setpoint, allowing for a smooth setpoint approach. On the flip side, if your error is increasing with a disturbance, this is a positive error slope, so this adds more error and more aggression to combat that change. 
+
+Proportional gain  =  Kp
+Integral term      =  Ti     (More Ti is less integral gain, Ki = 1/Ti)
+Derivative term    =  Td     (Td = Kd)
+
+## Communicating with maritime
+
+When a PC is connected via USB to the microcontroller, the PC can send and receive data to the microcontroller via the serial protocol. Instructions for this are in the main maritime readme.

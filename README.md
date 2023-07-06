@@ -32,18 +32,32 @@ After building and flashing, run tmux in a terminal. Split the tmux window into 
 |        Input        |     Description      |      Output       |
 +---------------------+----------------------+-------------------+
 | a                   | Kill switch (1=on).  | %i                |
+| b %f                | Set altitude.        | N/A               |
 | c                   | Sub location.        | %f %f %f %f %f %f |
-| d                   | Sub destination.     | %f %f %f %f %f %f |
+| m                   | Sub body velocity.   | %f %f %f          |
 | p %f                | Set power (0-1).     | N/A               |
 | s %f %f %f %f %f %f | Set destination.     | N/A               |
+| v %f %f %f          | Set body velocity.   | N/A               |
+| n %f %f %f          | Set angle setpoint.  | N/A               |
+| t %f %f %f          | Set angvel setpoint. | N/A               |
+| z %f                | Set depth (0-1).     | N/A               |
+| w                   | Sub altitude (0-1).  | N/A               |
 | r %f %f %f %f %f %f | Add relative state.  | N/A               |
-| h                   | Raw heading (0-360). | N/A               |
+| h                   | Raw heading & angles.| N/A               |
+| d                   | DVL data.            | %f %f %f %f       |
 | x                   | Reset all states.    | N/A               |
+| g %i %i             | Drop marker.         | N/A               |
+| u %i %i %f %f %f    | Set PID gain.        | N/A               |
+| f %f                | Close grabber.       | N/A               |
+| o %i %i             | Shoot torpedo.       | N/A               |
+| #                   | Sub depth.           | N/A               |
+| q                   | Start DVL relay.     | N/A               |
+| j                   | Stop DVL relay.      | N/A               |
 +---------------------+----------------------+-------------------+
 ```
 Each 6 %f's represent a state, or sub position. The order of the numbers is
 X, Y, Z, Yaw, Pitch, Roll. This is relative to a North-East-Down coordinate
-frame.
+frame. Maritime expects inputs of meters and degrees. Internally, it uses radians.
 
 ## What's the name?
 ![why-maritime-name](docs/why-maritime-name.png)
