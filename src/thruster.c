@@ -386,6 +386,11 @@ void canard_broadcast_thread(void *arg1, void *arg2, void *arg3) {
             uint8_t id = tx_frame->id >> 16;
             if (id == UAVCAN_PROTOCOL_GETNODEINFO_RESPONSE_ID) {
                 // LOG_DBG("Sending GET NODE INFO RESPONSE %u", id);
+		// Hela sus fix: for some reason this message bricks the code
+		// sometimes, so I'm discarding this message
+		canardPopTxQueue(&canard_ins);
+		tx_frame = canardPeekTxQueue(&canard_ins);
+		continue;
             } else if (id == UAVCAN_PROTOCOL_NODESTATUS_ID) {
                 // LOG_DBG("Sending node status RESPONSE %u", id);
 
