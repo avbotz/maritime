@@ -66,8 +66,8 @@ void pressure_thread(void *arg1, void *arg2, void *arg3){
 
     while (1) 
     {
-	for (int i = 0; i < 500; i++)
-	{
+        for (int i = 0; i < 500; i++)
+        {
             // Read integer (no units) that is proportional with pressure
             uint16_t buf;
             struct adc_sequence sequence = {
@@ -89,20 +89,20 @@ void pressure_thread(void *arg1, void *arg2, void *arg3){
             {
                 mean_sample += sample_weight * (buf - mean_sample);
             }
-	}
+        }
 
         // Calibrated with linear regression
         float depth = 0.000136 * (mean_sample - 23569.6);
 
         pressure_data.depth = depth;
-	while (k_msgq_put(&pressure_data_msgq, &pressure_data, K_NO_WAIT) != 0) {
+        while (k_msgq_put(&pressure_data_msgq, &pressure_data, K_NO_WAIT) != 0) {
             k_msgq_put(&pressure_data_msgq, &pressure_data, K_NO_WAIT);
         }
 
         // LOG_DBG("Pressure reading: %i", buf);
         LOG_DBG("Rolling mean estimate: %f", mean_sample);
         k_yield();
-	// k_sleep(K_MSEC(1));
+        // k_sleep(K_MSEC(1));
     }
 
     return;
