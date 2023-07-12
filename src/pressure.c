@@ -62,12 +62,15 @@ void pressure_thread(void *arg1, void *arg2, void *arg3){
     // Use a rolling mean estimator to filter out noise from the adc
     float sample_weight = 0.001;
     float mean_sample = -999;
+    int initial_sample = -999;
     struct pressure_data_s pressure_data;
+    int num_samples = 1400;
 
+    // Roughly 4 Hz update rate b/c of averaging samples
     while (1) 
     {
-        for (int i = 0; i < 500; i++)
-        {
+	for (int i = 0; i < num_samples; i++)
+	{
             // Read integer (no units) that is proportional with pressure
             uint16_t buf;
             struct adc_sequence sequence = {
@@ -79,30 +82,38 @@ void pressure_thread(void *arg1, void *arg2, void *arg3){
             adc_sequence_init_dt(&adc_channel, &sequence);
 
             adc_read(adc_channel.dev, &sequence);
-
+            
             // Initialize the first sample
             if (mean_sample < 0)
             {
                 mean_sample = buf;
+                LOG_DBG("Took initial sample of %i", buf);
             }
             else
             {
                 mean_sample += sample_weight * (buf - mean_sample);
             }
+	}
+        
+        // Get atmospheric pressure to base relative depth off of
+        if (initial_sample < 0)
+        {
+            initial_sample = mean_sample;
         }
 
         // Calibrated with linear regression
-        float depth = 0.000136 * (mean_sample - 23569.6);
+        float depth = 0.000136 * (mean_sample - initial_sample);
 
         pressure_data.depth = depth;
-        while (k_msgq_put(&pressure_data_msgq, &pressure_data, K_NO_WAIT) != 0) {
+	while (k_msgq_put(&pressure_data_msgq, &pressure_data, K_NO_WAIT) != 0) {
             k_msgq_put(&pressure_data_msgq, &pressure_data, K_NO_WAIT);
         }
 
         // LOG_DBG("Pressure reading: %i", buf);
         LOG_DBG("Rolling mean estimate: %f", mean_sample);
+        LOG_DBG("%f %f\n", mean_sample, initial_sample);
         k_yield();
-        // k_sleep(K_MSEC(1));
+	// k_sleep(K_MSEC(1));
     }
 
     return;
