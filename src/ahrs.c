@@ -18,217 +18,114 @@
 
 LOG_MODULE_REGISTER(uart_ahrs, LOG_LEVEL_INF);
 
-#define UART2_DEVICE_NODE DT_NODELABEL(usart1)
+#define UART2_DEVICE_NODE DT_NODELABEL(uart7)
 
 static const struct device *uart_device = DEVICE_DT_GET(UART2_DEVICE_NODE);
 
 K_MSGQ_DEFINE(ahrs_data_msgq, sizeof(struct ahrs_data_s), 1, 4);
 
-K_SEM_DEFINE(ahrs_rx_frame_buf_sem, 0, 1);
-
 // Total bytes the message can store
 #define MSG_SZ 512
-
-// #include <pubsub/pubsub.h>
 
 #define NS_ELAPSED(time_a, time_b) (timing_cycles_to_ns(timing_cycles_get(&time_a, &time_b)))
 
 RING_BUF_DECLARE_STATIC(ring_buf_tx, MSG_SZ);
 RING_BUF_DECLARE_STATIC(ring_buf_rx, MSG_SZ);
 
-static uint8_t buf[MSG_SZ];
-
-timing_t t = 0, a, b, c;
-
-bool seen_start = false;
-
-const uint8_t start_byte = 'w';
-
-
-const float TO_RAD = M_PI / 180.0f;
-const float TO_RAD_S = TO_RAD * 1e6f;
-
-uint32_t tt; 
-
-struct Quaternion {
-    double w, x, y, z;
+struct SAngle
+{
+    short Angle[3];
+    short T;
 };
 
-struct EulerAngles {
-    double roll, pitch, yaw;
-};
-
-// this implementation assumes normalized quaternion
-// converts to Euler angles in 3-2-1 sequence
-struct EulerAngles ToEulerAngles(struct Quaternion q) {
-    struct EulerAngles angles;
-
-    // roll (x-axis rotation)
-    double sinr_cosp = 2 * (q.w * q.x + q.y * q.z);
-    double cosr_cosp = 1 - 2 * (q.x * q.x + q.y * q.y);
-    angles.roll = atan2(sinr_cosp, cosr_cosp);
-
-    // pitch (y-axis rotation)
-    double sinp = sqrt(1 + 2 * (q.w * q.y - q.x * q.z));
-    double cosp = sqrt(1 - 2 * (q.w * q.y - q.x * q.z));
-    angles.pitch = 2 * atan2(sinp, cosp) - M_PI / 2;
-
-    // yaw (z-axis rotation)
-    double siny_cosp = 2 * (q.w * q.z + q.x * q.y);
-    double cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
-    angles.yaw = atan2(siny_cosp, cosy_cosp);
-
-    return angles;
-}
-
-uint32_t prev_time = 0;
 struct ahrs_data_s prev_sample = {
     .yaw   = 0,
     .pitch = 0,
     .roll  = 0
 };
 
-int process(char *buf, struct ahrs_data_s *ahrs_data) {
-    LOG_DBG("Received update: %s", buf);
-    char *str = buf;
-    char *end;
-    struct Quaternion quaternion;
-    struct EulerAngles angles;
-    
-    uint32_t cur_time = time_us();
-
-    uint32_t timestamp = (uint32_t)strtol(str, &end, 10);
-    if (timestamp == 0) return -1;
-    str = ++end;
-    tt = timestamp;
-
-    uint8_t sensor_id = (uint8_t)strtol(str, &end, 10); 
-    if (sensor_id != 15 || sensor_id == 0) return -1;
-    str = ++end;
-
-    quaternion.x = strtof(str, &end);
-    if (quaternion.x == 0) return -1;
-    str = ++end;
-
-    quaternion.y = strtof(str, &end);
-    if (quaternion.y == 0) return -1;
-    str = ++end;
-
-    quaternion.z = strtof(str, &end);
-    if (quaternion.z == 0) return -1;
-    str = ++end;
-
-    quaternion.w = strtof(str, &end);
-    if (quaternion.w == 0) return -1;
-    str = ++end;
-
-    float accuracy = strtof(str, &end);
-
-    angles = ToEulerAngles(quaternion);
-
-    ahrs_data->yaw = -angles.yaw;
-    ahrs_data->pitch = angles.roll;
-    ahrs_data->roll = angles.pitch;
-
-    // Check for nan
-    if (ahrs_data->yaw != ahrs_data->yaw ||
-        ahrs_data->pitch != ahrs_data->pitch ||
-	ahrs_data->roll != ahrs_data->roll)
-	return -1;
-
-    ahrs_data->ang_vel_yaw   = (ahrs_data->yaw - prev_sample.yaw) / (cur_time - prev_time) * 1e6f;
-    ahrs_data->ang_vel_pitch = (ahrs_data->pitch - prev_sample.pitch) / (cur_time - prev_time) * 1e6f;
-    ahrs_data->ang_vel_roll  = (ahrs_data->roll - prev_sample.roll) / (cur_time - prev_time) * 1e6f;
-
-    if (fabs(ahrs_data->ang_vel_yaw) > 3. ||
-        fabs(ahrs_data->ang_vel_pitch) > 3. ||
-	fabs(ahrs_data->ang_vel_roll) > 3.)
-        return -1;
-
-    LOG_DBG("Timestamp: %u\n\rYaw: %f, Pitch: %f, Roll: %f\n\rdt: %u, Vyaw: %f, Vpitch: %f, Vroll: %f",
-            timestamp,
-            ahrs_data->yaw,
-            ahrs_data->pitch,
-            ahrs_data->roll,
-            cur_time - prev_time,
-            ahrs_data->ang_vel_yaw,
-            ahrs_data->ang_vel_pitch,
-            ahrs_data->ang_vel_roll);
-
-    timing_t cur = timing_counter_get();
-    uint64_t el = NS_ELAPSED(t, cur);
-    LOG_DBG("%llu ns", el);
-    t = cur;
-    prev_time = cur_time;
-    memcpy(&prev_sample, ahrs_data, sizeof(struct ahrs_data_s));
-
-    return 0;
-}
-
-
 void process_frame() {
+
+    struct SAngle stcAngle;
+    int ahrs_time = time_us();
+
     while (true) {
-        if (k_sem_take(&ahrs_rx_frame_buf_sem, K_MSEC(100)) != 0) {
-            LOG_DBG("AHRS frame rx buffer sem exceeded 100 msec timeout");
-            k_yield();
-            continue;
-        } 
+        static unsigned char ucRxBuffer[250];
+        static unsigned char ucRxCnt = 0;   
 
         uint8_t rx_byte;
-        // uint32_t rb_len;
 
         uint64_t c0 = timing_counter_get();
-        // Ensure ring buf starts at frame start
-        while (true) {
-            ring_buf_peek(&ring_buf_rx, &rx_byte, 1);
-            if (rx_byte != start_byte) {
-                ring_buf_get(&ring_buf_rx, &rx_byte, 1);
-                // printk("misaligned frame, continuing to retrieve data %c\r\n", rx_byte);
-                // LOG_INF("Misaligned frame with char %c\r\n", rx_byte);
-            } else {
-                break;
-            }
+        ring_buf_get(&ring_buf_rx, &rx_byte, 1);
+        // Discard characters until the start of the packet
+        ucRxBuffer[ucRxCnt++] = rx_byte;
+        if (ucRxBuffer[0] != 0x55) 
+        {
+            ucRxCnt = 0;
+            k_yield();
+            continue;
         }
 
-        // Get ring buf data till frame end byte
-        // TODO: implement checksum before continuing processing
-        uint32_t len = 0;
-        while (true) {
-            if (len == MSG_SZ) {
-                return;
-            }
-
-            ring_buf_get(&ring_buf_rx, &rx_byte, 1);
-
-            if (rx_byte == 'w') {
-                continue;
-            }
-            if (rx_byte == '\r') {
-                break;
-            }
-
-            *(buf + len) = rx_byte;
-            ++len;
+        // Wait until we have built all 11 bytes of the packet?
+        if (ucRxCnt<11) 
+        {
+            k_yield();
+            continue;
         }
-        
-        buf[len] = '\0'; 
-        
-        // printk("received total frame: %s\n", buf);
-        
-        c = timing_counter_get();
-        LOG_DBG("Claim time: %llu ns", NS_ELAPSED(c0, c));
-         // LOG_DBG("Claim time (with sem): %llu ns", NS_ELAPSED(b, c));
+        else
+        {
+            // Store the angular data
+            switch(ucRxBuffer[1])
+            {
+                // case 0x50:  memcpy(&stcTime,&ucRxBuffer[2],8);break;
+                // case 0x51:  memcpy(&stcAcc,&ucRxBuffer[2],8);break;
+                // case 0x52:  memcpy(&stcGyro,&ucRxBuffer[2],8);break;
+                case 0x53:  memcpy(&stcAngle,&ucRxBuffer[2],8);break;
+                // case 0x54:  memcpy(&stcMag,&ucRxBuffer[2],8);break;
+                // case 0x55:  memcpy(&stcDStatus,&ucRxBuffer[2],8);break;
+                // case 0x56:  memcpy(&stcPress,&ucRxBuffer[2],8);break;
+                // case 0x57:  memcpy(&stcLonLat,&ucRxBuffer[2],8);break;
+                // case 0x58:  memcpy(&stcGPSV,&ucRxBuffer[2],8);break;
+                // case 0x59:  memcpy(&stcQuater,&ucRxBuffer[2],8);break;
+                // case 0x5a:  memcpy(&stcSN,&ucRxBuffer[2],8);break;
+            }
+            ucRxCnt=0;
+        }   
 
-        struct ahrs_data_s ahrs_data;
-        
-        int ret = process(buf, &ahrs_data);
+        // Publish new ahrs data every 50 ms
+        uint32_t dt_us = time_us() - ahrs_time;
+        if (dt_us > 50000)
+        {
+            struct ahrs_data_s ahrs_data;
 
-        if (ret == 0) {
+            // Witmotion ahrs uses ENU coordinate system, convert to NED system in rads
+            ahrs_data.yaw = -(float) deg_to_rad(stcAngle.Angle[2] / 32768. * 180);
+            ahrs_data.pitch = -(float) deg_to_rad(stcAngle.Angle[1] / 32768. * 180);
+            ahrs_data.roll = (float) deg_to_rad(stcAngle.Angle[0] / 32768. * 180);
+
+            ahrs_data.ang_vel_yaw = (ahrs_data.yaw - prev_sample.yaw) / dt_us * 1e6f;
+            ahrs_data.ang_vel_pitch = (ahrs_data.pitch - prev_sample.pitch) / dt_us * 1e6f;
+            ahrs_data.ang_vel_roll = (ahrs_data.roll - prev_sample.roll) / dt_us * 1e6f;
+            
             while (k_msgq_put(&ahrs_data_msgq, &ahrs_data, K_NO_WAIT) != 0) {
                 k_msgq_put(&ahrs_data_msgq, &ahrs_data, K_NO_WAIT);
             }
+
+            // LOG_DBG("Timestamp: %u", tt);
+            prev_sample = ahrs_data;
+            ahrs_time = time_us();
+            
+            // LOG_DBG("%f %f %f", ahrs_data.ang_vel_yaw, ahrs_data.ang_vel_pitch, ahrs_data.ang_vel_roll); 
+            LOG_DBG("Dt: %u\n\rYaw: %f, Pitch: %f, Roll: %f\n\rVyaw: %f, Vpitch: %f, Vroll: %f",
+                    dt_us,
+                    ahrs_data.yaw,
+                    ahrs_data.pitch,
+                    ahrs_data.roll,
+                    ahrs_data.ang_vel_yaw,
+                    ahrs_data.ang_vel_pitch,
+                    ahrs_data.ang_vel_roll);
         }
-        // LOG_DBG("Timestamp: %u", tt);
+
         k_yield();
     }
 }
@@ -263,23 +160,6 @@ static void uart_irq_callback(const struct device *dev, void *data) {
             // printk("%c", rx_byte);
             uart_fifo_read(uart_device, &rx_byte, 1);
             ring_buf_put(&ring_buf_rx, &rx_byte, 1);
-
-            if (rx_byte == '\r') {
-                if (!seen_start) {
-                    seen_start = true;
-                    a = timing_counter_get();
-                    ring_buf_put(&ring_buf_rx, &start_byte, 1);
-                } else {
-                    seen_start = false;
-                    b = timing_counter_get();
-                    k_sem_give(&ahrs_rx_frame_buf_sem);
-                    // LOG_DBG("Get: %llu ns", NS_ELAPSED(a, b));
-                }
-            } 
-
-            // echo back byte
-            // ring_buf_put(&ring_buf_tx, &rx_byte, 1);
-            // uart_irq_tx_enable(uart_device);
         }
     }
 
@@ -293,15 +173,6 @@ int setup_ahrs() {
 
     uart_irq_callback_user_data_set(uart_device, uart_irq_callback, NULL);
     uart_irq_rx_enable(uart_device);
-
-    uart_tx_msg("X");
-    k_sleep(K_MSEC(1000));
-    uart_tx_msg("M1\r");
-    uart_tx_msg("m0");
-    uart_tx_msg("V0");
-    uart_tx_msg("s,15," STR(AHRS_OUTPUT_RATE) "\r");
-
-    prev_time = time_us();
 
     LOG_DBG("Finished setting up AHRS");
 

@@ -5,3 +5,5 @@
 /zephyr
 /build
 /maritime_ec
+*.swp
+

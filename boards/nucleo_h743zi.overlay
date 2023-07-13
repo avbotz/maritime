@@ -114,6 +114,15 @@
     status = "okay";
 };
 
+&uart7 {
+    pinctrl-0 = <&uart7_tx_pf7 &uart7_rx_pf6>;
+    pinctrl-names = "default";
+    current-speed = <115200>;
+    status = "okay";
+};
+
+
+/*
 &i2c4 {
     pinctrl-0 = <&i2c4_scl_pd12 &i2c4_sda_pd13>;
     pinctrl-names = "default";
@@ -124,7 +133,7 @@
         reg = <0x76>;
     };
 };
-
+*/
 
 /*
 can1 already enabled, alias zephyr,canbus = &can1;

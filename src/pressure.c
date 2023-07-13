@@ -64,7 +64,7 @@ void pressure_thread(void *arg1, void *arg2, void *arg3){
     float mean_sample = -999;
     int initial_sample = -999;
     struct pressure_data_s pressure_data;
-    int num_samples = 1400;
+    int num_samples = 500;
 
     // Roughly 4 Hz update rate b/c of averaging samples
     while (1) 
