@@ -75,16 +75,27 @@ The relay is connected to a GPIO pin on the microcontroller. To trigger the rela
 
 * We are interested in angular velocity and attitude.
 
-* We use the [Naviguider AHRS](https://www.pnicorp.com/naviguider-modules/), which communicates with the microcontroller over UART. See their documentation for the format of the strings they send.
+* We use the WitMotion WT901, which communicates with the microcontroller over UART. See their documentation for the format of the strings they send.
 
 * To read data coming in from the AHRS, the process is similar to that of the DVL, except it parses the AHRS string which has a different format. 
 
+* Sometimes, the AHRS' angle sensor will drift. When this happens, boot into the Witmotion windows software:
+For the WitMotion, if something is going weird:
+- Make sure the board holding the AHRS and the boards holding parts near the AHRS (i.e. the Arduino or the microcontroller) are strapped down so that they do not budge when you push them. We had an issue in 2022 comp where the AHRS board and Arduino boards were not fastened down, leading to the Arduino board smashing the AHRS board, causing jitter that threw off the gyro on the AHRS and caused some drift. We fixed that by fastening the AHRS board by tightening the screws and using hot glue, and fastening the Arduino board by using electrical tape to tape it down so that it didn't move.
+- Use WitMotion Windows app (search up how to download it, it's on their website for the WT-901 AHRS)
+- Connect the AHRS to computer using FTDI (which is a Serial to USB converter)
+- Open their Windows app
+- Click Config -> Reset
+- Exit Config and reenter Config (for changes to update in the menu)
+- Click 6 axis mode to not use magnetometer (because magnetic fields make the reading drift and wobble heavy)
+- Make the output rate 100 Hz so that we get lots of data for the microcontroller to use and make PID adjustments fast to make the sub move smooth in the water (or else the sub might wobble back and forth on the yaw axis.)
+- Set the serial baud rate to 115200
+- Make sure changes are saved and then exit.
+
 ## Pressure Sensor
-* We use a [Blue Robotics Bar02](https://bluerobotics.com/store/sensors-cameras/sensors/bar02-sensor-r1-rp/) pressure sensor.
+* We use a Ashkroft K1 pressure sensor. It sends a raw voltage proportional with pressure to an analog to digital pin on the microcontroller. The microcontroller then converts this voltage to a number, which is then converted to depth in meters. 
 
-* We use the pressure sensor to find the depth of the submarine. Depth in meters = (pressure measured in kPa - air pressure, usually 101.325) / 9.80638.
-
-* The pressure sensor communicates with the microcontroller over the I2C protocol, so we assign it [a pin that is capable of using I2C](https://os.mbed.com/platforms/ST-Nucleo-H743ZI/).
+* Since the analog to digital converter (ADC) gives a unitless integer, we have to manually calibrate to find the mapping between the number and the actual meter depth. To do this, we collected lots of data points and did linear regression to find the relationship (x = integer reading, y = actual meter depth).
 
 ## Servos
 * We have three servos on the sub: for the grabber, dropper, and shooter.

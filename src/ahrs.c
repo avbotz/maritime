@@ -32,11 +32,14 @@ K_MSGQ_DEFINE(ahrs_data_msgq, sizeof(struct ahrs_data_s), 1, 4);
 RING_BUF_DECLARE_STATIC(ring_buf_tx, MSG_SZ);
 RING_BUF_DECLARE_STATIC(ring_buf_rx, MSG_SZ);
 
+unsigned char ucRxBuffer[250];
+unsigned char ucRxCnt = 0;
+
 struct SAngle
 {
     short Angle[3];
     short T;
-};
+} stcAngle;
 
 struct ahrs_data_s prev_sample = {
     .yaw   = 0,
@@ -46,87 +49,43 @@ struct ahrs_data_s prev_sample = {
 
 void process_frame() {
 
-    struct SAngle stcAngle;
     int ahrs_time = time_us();
+    int dt_us;
+    struct ahrs_data_s ahrs_data;
 
     while (true) {
-        static unsigned char ucRxBuffer[250];
-        static unsigned char ucRxCnt = 0;   
 
-        uint8_t rx_byte;
+        // Witmotion ahrs uses ENU coordinate system, convert to NED system in rads
+        ahrs_data.yaw = -(float) deg_to_rad(stcAngle.Angle[2] / 32768. * 180);
+        ahrs_data.pitch = -(float) deg_to_rad(stcAngle.Angle[1] / 32768. * 180);
+        ahrs_data.roll = (float) deg_to_rad(stcAngle.Angle[0] / 32768. * 180);
 
-        uint64_t c0 = timing_counter_get();
-        ring_buf_get(&ring_buf_rx, &rx_byte, 1);
-        // Discard characters until the start of the packet
-        ucRxBuffer[ucRxCnt++] = rx_byte;
-        if (ucRxBuffer[0] != 0x55) 
-        {
-            ucRxCnt = 0;
-            k_yield();
-            continue;
+        dt_us = time_us() - ahrs_time;
+
+        ahrs_data.ang_vel_yaw = (ahrs_data.yaw - prev_sample.yaw) / dt_us * 1e6f;
+        ahrs_data.ang_vel_pitch = (ahrs_data.pitch - prev_sample.pitch) / dt_us * 1e6f;
+        ahrs_data.ang_vel_roll = (ahrs_data.roll - prev_sample.roll) / dt_us * 1e6f;
+        
+        while (k_msgq_put(&ahrs_data_msgq, &ahrs_data, K_NO_WAIT) != 0) {
+            k_msgq_put(&ahrs_data_msgq, &ahrs_data, K_NO_WAIT);
         }
 
-        // Wait until we have built all 11 bytes of the packet?
-        if (ucRxCnt<11) 
-        {
-            k_yield();
-            continue;
-        }
-        else
-        {
-            // Store the angular data
-            switch(ucRxBuffer[1])
-            {
-                // case 0x50:  memcpy(&stcTime,&ucRxBuffer[2],8);break;
-                // case 0x51:  memcpy(&stcAcc,&ucRxBuffer[2],8);break;
-                // case 0x52:  memcpy(&stcGyro,&ucRxBuffer[2],8);break;
-                case 0x53:  memcpy(&stcAngle,&ucRxBuffer[2],8);break;
-                // case 0x54:  memcpy(&stcMag,&ucRxBuffer[2],8);break;
-                // case 0x55:  memcpy(&stcDStatus,&ucRxBuffer[2],8);break;
-                // case 0x56:  memcpy(&stcPress,&ucRxBuffer[2],8);break;
-                // case 0x57:  memcpy(&stcLonLat,&ucRxBuffer[2],8);break;
-                // case 0x58:  memcpy(&stcGPSV,&ucRxBuffer[2],8);break;
-                // case 0x59:  memcpy(&stcQuater,&ucRxBuffer[2],8);break;
-                // case 0x5a:  memcpy(&stcSN,&ucRxBuffer[2],8);break;
-            }
-            ucRxCnt=0;
-        }   
+        // LOG_DBG("Timestamp: %u", tt);
+        prev_sample = ahrs_data;
+        ahrs_time = time_us();
+        
+        // LOG_DBG("%f %f %f", ahrs_data.ang_vel_yaw, ahrs_data.ang_vel_pitch, ahrs_data.ang_vel_roll); 
+        LOG_DBG("Dt: %u\n\rYaw: %f, Pitch: %f, Roll: %f\n\rVyaw: %f, Vpitch: %f, Vroll: %f",
+                dt_us,
+                ahrs_data.yaw,
+                ahrs_data.pitch,
+                ahrs_data.roll,
+                ahrs_data.ang_vel_yaw,
+                ahrs_data.ang_vel_pitch,
+                ahrs_data.ang_vel_roll);
 
-        // Publish new ahrs data every 50 ms
-        uint32_t dt_us = time_us() - ahrs_time;
-        if (dt_us > 50000)
-        {
-            struct ahrs_data_s ahrs_data;
-
-            // Witmotion ahrs uses ENU coordinate system, convert to NED system in rads
-            ahrs_data.yaw = -(float) deg_to_rad(stcAngle.Angle[2] / 32768. * 180);
-            ahrs_data.pitch = -(float) deg_to_rad(stcAngle.Angle[1] / 32768. * 180);
-            ahrs_data.roll = (float) deg_to_rad(stcAngle.Angle[0] / 32768. * 180);
-
-            ahrs_data.ang_vel_yaw = (ahrs_data.yaw - prev_sample.yaw) / dt_us * 1e6f;
-            ahrs_data.ang_vel_pitch = (ahrs_data.pitch - prev_sample.pitch) / dt_us * 1e6f;
-            ahrs_data.ang_vel_roll = (ahrs_data.roll - prev_sample.roll) / dt_us * 1e6f;
-            
-            while (k_msgq_put(&ahrs_data_msgq, &ahrs_data, K_NO_WAIT) != 0) {
-                k_msgq_put(&ahrs_data_msgq, &ahrs_data, K_NO_WAIT);
-            }
-
-            // LOG_DBG("Timestamp: %u", tt);
-            prev_sample = ahrs_data;
-            ahrs_time = time_us();
-            
-            // LOG_DBG("%f %f %f", ahrs_data.ang_vel_yaw, ahrs_data.ang_vel_pitch, ahrs_data.ang_vel_roll); 
-            LOG_DBG("Dt: %u\n\rYaw: %f, Pitch: %f, Roll: %f\n\rVyaw: %f, Vpitch: %f, Vroll: %f",
-                    dt_us,
-                    ahrs_data.yaw,
-                    ahrs_data.pitch,
-                    ahrs_data.roll,
-                    ahrs_data.ang_vel_yaw,
-                    ahrs_data.ang_vel_pitch,
-                    ahrs_data.ang_vel_roll);
-        }
-
-        k_yield();
+        // Publish new data every 20 msec
+        k_sleep(K_MSEC(20));
     }
 }
 
@@ -159,7 +118,39 @@ static void uart_irq_callback(const struct device *dev, void *data) {
         if (uart_irq_rx_ready(uart_device)) {
             // printk("%c", rx_byte);
             uart_fifo_read(uart_device, &rx_byte, 1);
-            ring_buf_put(&ring_buf_rx, &rx_byte, 1);
+
+            // Discard characters until the start of the packet
+            ucRxBuffer[ucRxCnt++] = rx_byte;
+            if (ucRxBuffer[0] != 0x55) 
+            {
+                ucRxCnt = 0;
+                return;
+            }
+
+            // Wait until we have built all 11 bytes of the packet?
+            if (ucRxCnt<11) 
+            {
+                return;
+            }
+            else
+            {
+                // Store the angular data
+                switch(ucRxBuffer[1])
+                {
+                    // case 0x50:  memcpy(&stcTime,&ucRxBuffer[2],8);break;
+                    // case 0x51:  memcpy(&stcAcc,&ucRxBuffer[2],8);break;
+                    // case 0x52:  memcpy(&stcGyro,&ucRxBuffer[2],8);break;
+                    case 0x53:  memcpy(&stcAngle,&ucRxBuffer[2],8);break;
+                    // case 0x54:  memcpy(&stcMag,&ucRxBuffer[2],8);break;
+                    // case 0x55:  memcpy(&stcDStatus,&ucRxBuffer[2],8);break;
+                    // case 0x56:  memcpy(&stcPress,&ucRxBuffer[2],8);break;
+                    // case 0x57:  memcpy(&stcLonLat,&ucRxBuffer[2],8);break;
+                    // case 0x58:  memcpy(&stcGPSV,&ucRxBuffer[2],8);break;
+                    // case 0x59:  memcpy(&stcQuater,&ucRxBuffer[2],8);break;
+                    // case 0x5a:  memcpy(&stcSN,&ucRxBuffer[2],8);break;
+                }
+                ucRxCnt=0;
+            }   
         }
     }
 
