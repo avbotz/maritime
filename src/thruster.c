@@ -381,8 +381,13 @@ void canard_broadcast_thread(void *arg1, void *arg2, void *arg3) {
             LOG_DBG("could not lock %d", ret);
             return;
         }
+        
         const CanardCANFrame *tx_frame = canardPeekTxQueue(&canard_ins);
-        while (tx_frame) {
+
+        // The counter basically acts as a timeout so that this while loop 
+        // doesn't lock the mutex too long
+        int counter = 0;
+        while (tx_frame && counter < 5) {
             uint8_t id = tx_frame->id >> 16;
             if (id == UAVCAN_PROTOCOL_GETNODEINFO_RESPONSE_ID) {
                 // LOG_DBG("Sending GET NODE INFO RESPONSE %u", id);
@@ -398,6 +403,7 @@ void canard_broadcast_thread(void *arg1, void *arg2, void *arg3) {
             can_send_canard_frame(tx_frame);
             canardPopTxQueue(&canard_ins);
             tx_frame = canardPeekTxQueue(&canard_ins);
+            counter++;
         }
         k_mutex_unlock(&canard_tx_queue_mutex);
         k_yield();
@@ -515,3 +521,4 @@ K_THREAD_DEFINE(canard_broadcast_thread_id, 4096,
 K_THREAD_DEFINE(can_rx_frame_handle_thread_id, 4096,
                 can_rx_frame_handle_thread, NULL, NULL, NULL,
                 K_LOWEST_APPLICATION_THREAD_PRIO, 0, 0);
+

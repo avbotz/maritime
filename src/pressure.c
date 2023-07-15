@@ -66,7 +66,20 @@ void pressure_thread(void *arg1, void *arg2, void *arg3){
     struct pressure_data_s pressure_data;
     int num_samples = 500;
 
-    // Roughly 4 Hz update rate b/c of averaging samples
+    // Get the pressure reading at surface/atmosphere level for base reading
+    for (int i = 0; i < num_samples; i++)
+    {
+        uint16_t buf;
+        struct adc_sequence sequence = {
+            .buffer = &buf,
+            .buffer_size = sizeof(buf)
+        };
+        adc_sequence_init_dt(&adc_channel, &sequence);
+        adc_read(adc_channel.dev, &sequence);
+        initial_sample += buf;
+    }
+    initial_sample /= num_samples;
+
     while (1) 
     {
 	for (int i = 0; i < num_samples; i++)

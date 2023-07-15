@@ -533,6 +533,7 @@ int main(void)
                 dt
                 );
 
+            /* Really jank: Seems like the functions don't work sometimes, so pasting their code here
             if (!velocity_override)
             {
                 position_controller_update(
@@ -553,6 +554,75 @@ int main(void)
                 &force_out,
                 dt
                 );
+            */
+
+            if (!velocity_override)
+            {
+                struct mec_vehicle_position ned_error;
+
+                ned_error.north = position_sp.north - position.north;
+                ned_error.east = position_sp.east - position.east;
+                if (pos_controller.use_floor_altitude)
+                    ned_error.down = position.altitude - position_sp.altitude;
+                else
+                    ned_error.down = position_sp.down - position.down;
+
+                struct mec_vehicle_position_body error;
+                position_ned_to_body(
+                    &error, 
+                    &ned_error, 
+                    &attitude);
+
+                float max_speed = 1.;
+
+                velocity_body_sp.forward_m_s = normalize(
+                    pid_calculate(
+                        &pos_controller.pid[0], 
+                        error.forward, 
+                        dt), 
+                    -max_speed, 
+                    max_speed);
+
+                velocity_body_sp.right_m_s = normalize(
+                    pid_calculate(
+                        &pos_controller.pid[1], 
+                        error.right, 
+                        dt), 
+                    -max_speed, 
+                    max_speed);
+
+                velocity_body_sp.down_m_s = normalize(
+                    pid_calculate(
+                        &pos_controller.pid[2], 
+                        error.down, 
+                        dt), 
+                    -max_speed, 
+                    max_speed);            
+            }
+
+            struct mec_vehicle_velocity_body velocity_body_error;
+
+            velocity_body_error.forward_m_s = velocity_body_sp.forward_m_s - velocity_body.forward_m_s;
+            velocity_body_error.right_m_s = velocity_body_sp.right_m_s - velocity_body.right_m_s;
+            velocity_body_error.down_m_s = velocity_body_sp.down_m_s - velocity_body.down_m_s;
+
+            force_out.forward = normalize(pid_calculate(&vel_controller.pid[0], velocity_body_error.forward_m_s, dt), -1, 1);
+            force_out.right = normalize(pid_calculate(&vel_controller.pid[1], velocity_body_error.right_m_s, dt), -1, 1);
+            force_out.down = normalize(pid_calculate(&vel_controller.pid[2], velocity_body_error.down_m_s, dt), -1, 1);
+
+            // ARW
+            if (force_out.forward >= 1 || force_out.forward <= -1)
+            {
+                vel_controller.pid[0].integral -= velocity_body_error.forward_m_s * dt;
+            }
+            if (force_out.right >= 1 || force_out.right <= -1)
+            {
+                vel_controller.pid[1].integral -= velocity_body_error.right_m_s * dt;
+            }
+            if (force_out.down >= 1 || force_out.down <= -1)
+            {
+                vel_controller.pid[2].integral -= velocity_body_error.down_m_s * dt;
+            }
 
             // Map forces and torques to thruster outputs
             float thruster_outputs[8];

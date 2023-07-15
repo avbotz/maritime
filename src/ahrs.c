@@ -170,7 +170,6 @@ int setup_ahrs() {
     return 0; 
 }
 
-
 K_THREAD_DEFINE(ahrs_rx_frame_handle_thread_id, 4096,
                 process_frame, NULL, NULL, NULL,
                 K_LOWEST_APPLICATION_THREAD_PRIO, 0, 0);
