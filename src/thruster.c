@@ -384,7 +384,7 @@ void canard_broadcast_thread(void *arg1, void *arg2, void *arg3) {
         
         const CanardCANFrame *tx_frame = canardPeekTxQueue(&canard_ins);
 
-        // The counter basically acts as a timeout so that this while loop 
+        // The counter basically acts as a tiemout so that this while loop
         // doesn't lock the mutex too long
         int counter = 0;
         while (tx_frame && counter < 5) {
