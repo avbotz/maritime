@@ -20,8 +20,8 @@ static const uint32_t dropper_mid_pulse = (dropper_min_pulse + dropper_max_pulse
 /* Grabber only uses only part of the servo's range, from 37% to 66% of servo's range */
 static const uint32_t grabber_min_pulse = DT_PROP(DT_NODELABEL(grabber_servo), min_pulse);
 static const uint32_t grabber_max_pulse = DT_PROP(DT_NODELABEL(grabber_servo), max_pulse);
-static const uint32_t grabber_range_min_pulse = (uint32_t) (grabber_min_pulse + 0.370 * (grabber_max_pulse - grabber_min_pulse));
-static const uint32_t grabber_range_max_pulse = (uint32_t) (grabber_min_pulse + 0.570 * (grabber_max_pulse - grabber_min_pulse));
+static const uint32_t grabber_range_min_pulse = 1150000; 
+static const uint32_t grabber_range_max_pulse = 1460000;
 
 static const uint32_t shooter_min_pulse = DT_PROP(DT_NODELABEL(shooter_servo), min_pulse);
 static const uint32_t shooter_max_pulse = DT_PROP(DT_NODELABEL(shooter_servo), max_pulse);

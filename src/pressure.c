@@ -96,12 +96,10 @@ void pressure_thread(void *arg1, void *arg2, void *arg3){
     }
     initial_sample /= num_samples;
 
-    mean_sample = initial_sample;
-
     while (1) 
     {
-        for (int i = 0; i < num_samples; i++)
-        {
+	for (int i = 0; i < num_samples; i++)
+	{
             // Read integer (no units) that is proportional with pressure
             uint16_t buf;
             struct adc_sequence sequence = {
@@ -114,14 +112,29 @@ void pressure_thread(void *arg1, void *arg2, void *arg3){
 
             adc_read(adc_channel.dev, &sequence);
             
-            mean_sample += sample_weight * (buf - mean_sample);
+            // Initialize the first sample
+            if (mean_sample < 0)
+            {
+                mean_sample = buf;
+                LOG_DBG("Took initial sample of %i", buf);
+            }
+            else
+            {
+                mean_sample += sample_weight * (buf - mean_sample);
+            }
+	}
+        
+        // Get atmospheric pressure to base relative depth off of
+        if (initial_sample < 0)
+        {
+            initial_sample = mean_sample;
         }
 
         // Calibrated with linear regression
         float depth = 0.000136 * (mean_sample - initial_sample);
 
         pressure_data.depth = depth;
-        while (k_msgq_put(&pressure_data_msgq, &pressure_data, K_NO_WAIT) != 0) {
+	while (k_msgq_put(&pressure_data_msgq, &pressure_data, K_NO_WAIT) != 0) {
             k_msgq_put(&pressure_data_msgq, &pressure_data, K_NO_WAIT);
         }
 

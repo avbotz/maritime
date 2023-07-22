@@ -65,6 +65,14 @@ void process_frame() {
         ahrs_data.ang_vel_yaw = (ahrs_data.yaw - prev_sample.yaw) / dt_us * 1e6f;
         ahrs_data.ang_vel_pitch = (ahrs_data.pitch - prev_sample.pitch) / dt_us * 1e6f;
         ahrs_data.ang_vel_roll = (ahrs_data.roll - prev_sample.roll) / dt_us * 1e6f;
+        // Invalid angular velocity, discard it
+        if (fabs(ahrs_data.ang_vel_yaw) > 2 ||
+            fabs(ahrs_data.ang_vel_pitch) > 2 ||
+            fabs(ahrs_data.ang_vel_roll) > 2)
+        {
+            k_yield();
+            continue;
+        } 
         
         while (k_msgq_put(&ahrs_data_msgq, &ahrs_data, K_NO_WAIT) != 0) {
             k_msgq_put(&ahrs_data_msgq, &ahrs_data, K_NO_WAIT);

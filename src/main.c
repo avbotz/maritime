@@ -115,6 +115,14 @@ int main(void)
     velocity_controller_init(&vel_controller);
     mec_vehicle_position_init(&position);
 
+    vel_controller.pid[0].integral = 0;
+    vel_controller.pid[1].integral = 0;
+    vel_controller.pid[2].integral = 0;
+
+    angular_velocity_controller.pid[0].integral = 0;
+    angular_velocity_controller.pid[1].integral = 0;
+    angular_velocity_controller.pid[2].integral = 0;
+
     position_sp.north = 0;
     position_sp.east = 0;
     position_sp.down = 0;
@@ -171,7 +179,8 @@ int main(void)
             // Todo: Change this protocol to be more readable
             if (c == 'a')
             {
-                printk("%d\n", alive());
+                bool is_alive = alive();
+                printk("%d\n", is_alive);
             }
             else if (c == 'b')
             {
@@ -609,7 +618,7 @@ int main(void)
             force_out.forward = normalize(pid_calculate(&vel_controller.pid[0], velocity_body_error.forward_m_s, dt), -1, 1);
             force_out.right = normalize(pid_calculate(&vel_controller.pid[1], velocity_body_error.right_m_s, dt), -1, 1);
             force_out.down = normalize(pid_calculate(&vel_controller.pid[2], velocity_body_error.down_m_s, dt), -1, 1);
-
+            // printk("Vel: %f %f %f\nForce: %f %f %f\n", velocity_body_error.forward_m_s, velocity_body_error.right_m_s, velocity_body_error.down_m_s, force_out.forward, force_out.right, force_out.down);
             // ARW
             if (force_out.forward >= 1 || force_out.forward <= -1)
             {
@@ -621,7 +630,7 @@ int main(void)
             }
             if (force_out.down >= 1 || force_out.down <= -1)
             {
-                vel_controller.pid[2].integral -= velocity_body_error.down_m_s * dt;
+                vel_controller.pid[2].integral -= (velocity_body_error.down_m_s * dt);
             }
 
             // Map forces and torques to thruster outputs
