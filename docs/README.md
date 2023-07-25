@@ -110,6 +110,17 @@ For the WitMotion, if something is going weird:
 
 * There are certain pre-defined PWM pins that can be found on the [nucleo's pinout](https://os.mbed.com/platforms/ST-Nucleo-F767ZI/). Each pin has a specific timer and channel that we need to specify in the overlay. We get them from [here](https://github.com/micropython/micropython/blob/master/ports/stm32/boards/stm32f767_af.csv).
 
+## Servo testing and programming
+You can test and program a servo (useful for adding overload protection, servo endpoints, etc.) by connecting a servo to the [DPC-11 Programming Interface](https://hitecrcd.com/products/servos/programmers/dpc-11/product), and running its [interfacing software](https://hitecrcd.com/uploads/DPC-11_Install__2020_12_09_01-2.9.9.zip) on a Windows 10/11 computer.
+
+To run the interfacing software properly, you'll need to enable .NET 3.5 on your device. To do this, use the Windows start menu to navigate to "Turn Windows features on and off" and select ".NET Framework 3.5 (includes .NET 2.0 and 3.0)." Then navigate to `DPC-11_Install__2020_12_09_01-2.9.9/DPC-11_2020_12_09_01-2.9.9/` and run `DPC-11_Setup.msi`
+
+To get drivers set up on your computer to properly interface with the DPC-11, you'll need to disable driver signature enforcement. In Windows settings, go to Settings > Recovery > Advanced Startup > Restart Now. During startup, click on Troubleshoot > Advanced Options > Startup Settings > Restart, and then press 7 / F7 to disable driver signature enforcement.
+
+Once your device boots up, navigate to `DPC-11_Install__2020_12_09_01-2.9.9/DPC-11_2020_12_09_01-2.9.9/HITECRCD_DPC-11 Driver Installer` and run `install_DPC-11_2020_12_09_01-2.9.9.exe` to install the drivers. To configure Windows to use the drivers with your DPC-11, plug it in, and then navigate to it on Windows Device Manager. Right click on it and press "Update drivers," then "Browse my computer for drivers," select the `HITECRCD_DPC-11 Driver Installer` folder, and then hit "Next." Once you've completed all this, you'll be able to use the DPC-11 software to interface with your servo!
+
+To use the DPC-11 software, run it with the Windows start menu and, from the app's menu, select the appropriate type for your servo (Botz use BlueTrail's D-Series servos), then plug in the DPC-11 via USB; you should see the rectangle on the top left turn green. Now wire up the servo to the DPC-11 and press the "Connect" button on your computer. To wire it up, you need to use female duponts. You can input around 6V into the "Batt" power port and a ground. Then on the servo port, route the servo's power, ground, and signal. Hopefully all goes well and you can finally start programming/testing your servo in accordance with [the manual](https://hitecrcd.com/images/products/pdf/411_DPC11_ManualV3.pdf).
+
 ## Thrusters/ESCS
 We send commands to 8 electronic speed controllers (ESCs), which then spin the thrusters. We use the CAN protocol to send these commands.
 
@@ -169,3 +180,4 @@ We use PID controllers to edit the raw position/angle error to optimally control
 ## Communicating with maritime
 
 When a PC is connected via USB to the microcontroller, the PC can send and receive data to the microcontroller via the serial protocol. Instructions for this are in the main maritime readme.
+
