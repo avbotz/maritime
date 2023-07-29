@@ -323,9 +323,9 @@ int main(void)
             else if (c == 'h')
             {
                 printk("%f %f %f\n", 
-		    rad_to_deg(ahrs_data.yaw),
-		    rad_to_deg(ahrs_data.pitch),
-		    rad_to_deg(ahrs_data.roll));
+                rad_to_deg(ahrs_data.yaw),
+                rad_to_deg(ahrs_data.pitch),
+                rad_to_deg(ahrs_data.roll));
             }
             else if (c == 'd')
             {
@@ -403,15 +403,15 @@ int main(void)
             {
                 printk("%f\n", pressure_data.depth);
             }
-	    // Debug characters to test the dvl switch
-	    else if (c == 'q')
-	    {
-		start_dvl_uart();
-	    }
-	    else if (c == 'j')
-	    {
-	        stop_dvl_uart();
-	    }
+            // Debug characters to test the dvl switch
+            else if (c == 'q')
+            {
+                start_dvl_uart();
+            }
+            else if (c == 'j')
+            {
+                stop_dvl_uart();
+            }
         }
 
         alive_state_prev = alive_state;
@@ -452,9 +452,9 @@ int main(void)
             attitude.yaw = 0.;
             att_sp.yaw = 0.;
 
-	    angvel_sp.yaw_rad_s = 0;
-	    angvel_sp.pitch_rad_s = 0;
-	    angvel_sp.roll_rad_s = 0;
+            angvel_sp.yaw_rad_s = 0;
+            angvel_sp.pitch_rad_s = 0;
+            angvel_sp.roll_rad_s = 0;
 
             INITIAL_YAW = ahrs_data.yaw;
 
@@ -463,8 +463,8 @@ int main(void)
             pause = true;
             pause_time = k_uptime_get_32();
 
-	    velocity_override = false;
-	    angvel_override = false;
+            velocity_override = false;
+            angvel_override = false;
 
             position_controller_update_sp(&pos_controller, &position_sp);
             att_controller_update_sp(&attitude_controller, &att_sp);
@@ -522,6 +522,7 @@ int main(void)
             //    position.altitude, &position, &attitude, dt);
 
             // Compute thruster outputs from error in current state to state setpoint
+            /* Really jank: Seems like the functions don't work sometimes, so pasting their code here instead
             if (!angvel_override)
             {
                 att_controller_update(
@@ -542,7 +543,6 @@ int main(void)
                 dt
                 );
 
-            /* Really jank: Seems like the functions don't work sometimes, so pasting their code here
             if (!velocity_override)
             {
                 position_controller_update(
@@ -565,6 +565,77 @@ int main(void)
                 );
             */
 
+            // Calculate angvel setpoint
+            if (!angvel_override)
+            {
+                struct mec_vehicle_attitude att_error;
+
+                att_error.roll = angle_difference(att_sp.roll, attitude.roll);
+                att_error.pitch = angle_difference(att_sp.pitch, attitude.pitch);
+                att_error.yaw = angle_difference(att_sp.yaw, attitude.yaw);
+
+                angvel_sp.roll_rad_s = normalize(
+                    pid_calculate(
+                        &attitude_controller.pid[0], 
+                        att_error.roll, 
+                        dt), 
+                    -2, 2);
+                angvel_sp.pitch_rad_s = normalize(
+                    pid_calculate(
+                        &attitude_controller.pid[1], 
+                        att_error.pitch, 
+                        dt), 
+                    -2, 2);
+                angvel_sp.yaw_rad_s = normalize(
+                    pid_calculate(
+                        &attitude_controller.pid[2], 
+                        att_error.yaw, 
+                        dt), 
+                    -2, 2);
+            }
+
+            // Calculate torque necessary to get to that angvel setpoint
+            struct mec_vehicle_angvel angvel_error;
+
+            angvel_error.roll_rad_s = angvel_sp.roll_rad_s - angvel.roll_rad_s;
+            angvel_error.pitch_rad_s = angvel_sp.pitch_rad_s - angvel.pitch_rad_s;
+            angvel_error.yaw_rad_s = angvel_sp.yaw_rad_s - angvel.yaw_rad_s;
+
+            torque_out.roll = normalize(
+                pid_calculate(
+                    &angular_velocity_controller.pid[0], 
+                    angvel_error.roll_rad_s, 
+                    dt), 
+                -1, 1);
+            torque_out.pitch = normalize(
+                pid_calculate(
+                    &angular_velocity_controller.pid[1], 
+                    angvel_error.pitch_rad_s, 
+                    dt), 
+                -1, 1);
+            torque_out.yaw = normalize(
+                pid_calculate(
+                    &angular_velocity_controller.pid[2], 
+                    angvel_error.yaw_rad_s, 
+                    dt), 
+                -1, 1);
+
+            // Anti-reset windup
+            float limit = 1;
+            if (torque_out.roll >= limit || torque_out.roll <= limit)
+            {
+                angular_velocity_controller.pid[0].integral -= angvel_error.roll_rad_s * dt;
+            }
+            if (torque_out.pitch >= limit || torque_out.pitch <= limit)
+            {
+                angular_velocity_controller.pid[1].integral -= angvel_error.pitch_rad_s * dt;
+            }
+            if (torque_out.yaw >= limit || torque_out.yaw <= limit)
+            {
+                angular_velocity_controller.pid[2].integral -= angvel_error.yaw_rad_s * dt;
+            }
+
+            // Calculate velocity setpoint
             if (!velocity_override)
             {
                 struct mec_vehicle_position ned_error;
@@ -609,6 +680,7 @@ int main(void)
                     max_speed);            
             }
 
+            // Calculate force necessary to get to that velocity setpoint
             struct mec_vehicle_velocity_body velocity_body_error;
 
             velocity_body_error.forward_m_s = velocity_body_sp.forward_m_s - velocity_body.forward_m_s;

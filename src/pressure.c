@@ -47,6 +47,7 @@ int setup_pressure() {
 */    return 0;
 }
 
+/*
 void pressure_thread(void *arg1, void *arg2, void *arg3){
     ARG_UNUSED(arg1);
     ARG_UNUSED(arg2);
@@ -80,7 +81,6 @@ void pressure_thread(void *arg1, void *arg2, void *arg3){
     }
     initial_sample /= num_samples;
 
-    // Take a second sample for accuracy
     initial_sample = 0;
     
     for (int i = 0; i < num_samples; i++)
@@ -96,15 +96,17 @@ void pressure_thread(void *arg1, void *arg2, void *arg3){
     }
     initial_sample /= num_samples;
 
+    mean_sample = initial_sample;
+
     while (1) 
     {
-	for (int i = 0; i < num_samples; i++)
-	{
+        for (int i = 0; i < num_samples; i++)
+        {
             // Read integer (no units) that is proportional with pressure
             uint16_t buf;
             struct adc_sequence sequence = {
                 .buffer = &buf,
-                /* buffer size in bytes, not number of samples */
+                // buffer size in bytes, not number of samples 
                 .buffer_size = sizeof(buf),
             };
 
@@ -112,17 +114,8 @@ void pressure_thread(void *arg1, void *arg2, void *arg3){
 
             adc_read(adc_channel.dev, &sequence);
             
-            // Initialize the first sample
-            if (mean_sample < 0)
-            {
-                mean_sample = buf;
-                LOG_DBG("Took initial sample of %i", buf);
-            }
-            else
-            {
-                mean_sample += sample_weight * (buf - mean_sample);
-            }
-	}
+            mean_sample += sample_weight * (buf - mean_sample);
+}
         
         // Get atmospheric pressure to base relative depth off of
         if (initial_sample < 0)
@@ -134,7 +127,7 @@ void pressure_thread(void *arg1, void *arg2, void *arg3){
         float depth = 0.000136 * (mean_sample - initial_sample);
 
         pressure_data.depth = depth;
-	while (k_msgq_put(&pressure_data_msgq, &pressure_data, K_NO_WAIT) != 0) {
+        while (k_msgq_put(&pressure_data_msgq, &pressure_data, K_NO_WAIT) != 0) {
             k_msgq_put(&pressure_data_msgq, &pressure_data, K_NO_WAIT);
         }
 
@@ -148,6 +141,8 @@ void pressure_thread(void *arg1, void *arg2, void *arg3){
     return;
 }
 
+
 K_THREAD_DEFINE(pressure_thread_id, 4096,
                 pressure_thread, NULL, NULL, NULL,
                 K_LOWEST_APPLICATION_THREAD_PRIO, 0, 0);
+*/

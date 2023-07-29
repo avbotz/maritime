@@ -132,33 +132,24 @@
 };
 */
 
-/*
-can1 already enabled, alias zephyr,canbus = &can1;
-
+/* can is used for sending messages to thrusters' escs */
 &can1 {
-    pinctrl-0 = <&can1_rx_pd0 &can1_tx_pd1>;
+    pinctrl-0 = <&fdcan1_rx_pd0 &fdcan1_tx_pd1>;
     pinctrl-names = "default";
     bus-speed = <125000>;
+    bus-speed-data = <1000000>;
     status = "okay";
 };
 
-&can2 {
-    pinctrl-0 = <&can2_rx_pb5 &can2_tx_pb6>;
-    pinctrl-names = "default";
-    bus-speed = <125000>;
-    status = "okay";
-}
-*/
-
 /*
  * Read the pressure sensor, via an analog to digital converter 
- * Use pin PC3, which has ADC12_INP4
- * https://github.com/micropython/micropython/blob/master/ports/stm32/boards/stm32h723_af.csv
+ * Use pin PC3, which has ADC3_INP3
+ * https://github.com/micropython/micropython/blob/master/ports/stm32/boards/stm32h743_af.csv
  */
 / {
     zephyr,user {
         /* adjust channel number according to pinmux in board.dts */
-        io-channels = <&adc3 1>;
+        io-channels = <&adc3 3>;
     };
 };
 
@@ -166,8 +157,8 @@ can1 already enabled, alias zephyr,canbus = &can1;
     #address-cells = <1>;
     #size-cells = <0>;
 
-    channel@1 {
-        reg = <1>;
+    channel@3 {
+        reg = <3>;
         zephyr,gain = "ADC_GAIN_1";
         zephyr,reference = "ADC_REF_INTERNAL";
         zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
