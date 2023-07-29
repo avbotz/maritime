@@ -109,6 +109,16 @@
     };
 };
 
+&i2c2 {
+    pinctrl-0 = <&i2c2_scl_pb15 &i2c2_sda_pb11>;
+    pinctrl-names = "default";
+    status = "okay";
+    clock-frequency = <I2C_BITRATE_STANDARD>;
+    ads1115@48 {
+        compatible = "ti, ads1115";
+        reg = <0x48>;
+    };
+};
 
 /*
 can1 already enabled, alias zephyr,canbus = &can1;
