@@ -22,8 +22,8 @@ static const uint32_t dropper_range_max_pulse = 1700000;
 /* Grabber only uses only part of the servo's range, from 37% to 66% of servo's range */
 static const uint32_t grabber_min_pulse = DT_PROP(DT_NODELABEL(grabber_servo), min_pulse);
 static const uint32_t grabber_max_pulse = DT_PROP(DT_NODELABEL(grabber_servo), max_pulse);
-static const uint32_t grabber_range_min_pulse = 950000; 
-static const uint32_t grabber_range_max_pulse = 2100000;
+static const uint32_t grabber_range_min_pulse = 918352; 
+static const uint32_t grabber_range_max_pulse = 2121850;
 
 static const uint32_t shooter_min_pulse = DT_PROP(DT_NODELABEL(shooter_servo), min_pulse);
 static const uint32_t shooter_max_pulse = DT_PROP(DT_NODELABEL(shooter_servo), max_pulse);
@@ -47,7 +47,7 @@ void setup_servos()
             LOG_DBG("Shooter device is not ready");
 
         int ret;
-	ret = pwm_set_pulse_dt(&dropper_servo, dropper_mid_pulse);
+	ret = pwm_set_pulse_dt(&dropper_servo, dropper_range_mid_pulse);
 	if (ret < 0)
             LOG_DBG("Failed to set pwm pulse for dropper servo, error code %i", ret);
         ret = pwm_set_pulse_dt(&grabber_servo, grabber_range_min_pulse);
@@ -97,8 +97,9 @@ void grab(float value)
         LOG_DBG("Opened grab for %f", value);
 	uint32_t pulse_width = (uint32_t) (grabber_range_min_pulse + 
 		value * (grabber_range_max_pulse - grabber_range_min_pulse));
-	// int ret = pwm_set_pulse_dt(&grabber_servo, pulse_width);
-        int ret = pwm_set_pulse_dt(&shooter_servo, value);
+	int ret = pwm_set_pulse_dt(&grabber_servo, pulse_width);
+        // int ret = pwm_set_pulse_dt(&shooter_servo, value);
+        LOG_DBG("Pulse width %i", pulse_width);
         if (ret < 0)
             LOG_DBG("Failed to set pulse width for grabber, error code %i", ret);
 }

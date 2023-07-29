@@ -17,13 +17,15 @@ LOG_MODULE_REGISTER(test_pressure, LOG_LEVEL_INF);
     ADC_DT_SPEC_GET_BY_IDX(node_id, idx),
 
 /* Data of ADC io-channels specified in devicetree. */
+/*
 static const struct adc_dt_spec adc_channels[] = {
     DT_FOREACH_PROP_ELEM(DT_PATH(zephyr_user), io_channels,
                  DT_SPEC_AND_COMMA)
 };
 
 static const struct adc_dt_spec adc_channel = adc_channels[0];
-
+*/
+    
 int setup_pressure() {
 /*    static struct sensor_value oversampling_rate = { 8192, 0 };
     LOG_DBG("Setting up pressure");

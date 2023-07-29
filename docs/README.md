@@ -79,7 +79,7 @@ The relay is connected to a GPIO pin on the microcontroller. To trigger the rela
 
 * To read data coming in from the AHRS, the process is similar to that of the DVL, except it parses the AHRS string which has a different format. 
 
-* Sometimes, the AHRS' angle sensor will drift. When this happens, boot into the Witmotion windows software:
+* Sometimes, the AHRS' angle sensor will drift. When this happens, boot into the Witmotion windows software (reset this sensor every 3 days):
 For the WitMotion, if something is going weird:
 - Make sure the board holding the AHRS and the boards holding parts near the AHRS (i.e. the Arduino or the microcontroller) are strapped down so that they do not budge when you push them. We had an issue in 2022 comp where the AHRS board and Arduino boards were not fastened down, leading to the Arduino board smashing the AHRS board, causing jitter that threw off the gyro on the AHRS and caused some drift. We fixed that by fastening the AHRS board by tightening the screws and using hot glue, and fastening the Arduino board by using electrical tape to tape it down so that it didn't move.
 - Use WitMotion Windows app (search up how to download it, it's on their website for the WT-901 AHRS)

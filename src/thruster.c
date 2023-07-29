@@ -32,8 +32,6 @@ LOG_MODULE_REGISTER(uavcan, LOG_LEVEL_INF);
 //ZZ LOG_MODULE_REGISTER(uavcan, LOG_LEVEL_DBG);
 
 const static struct device *can_dev = DEVICE_DT_GET(DT_NODELABEL(can1));
-// const static struct device *can_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_canbus));
-
 
 int ret;
 
@@ -164,17 +162,23 @@ void can_rx_frame_handle_thread(void *arg1, void *arg2, void *arg3) {
     }
 }
 
+void can_send_callback(void *arg1)
+{
+    return;
+}
 
 void can_send_canard_frame(const CanardCANFrame *canard_frame) {
-    // LOG_DBG("Sending canard frame with id: %u", canard_frame->id);
+    LOG_DBG("Sending canard frame with id: %u", canard_frame->id);
     struct can_frame tx_frame = {
         .id    = canard_frame->id,
         .dlc   = canard_frame->data_len,
         .flags = CAN_FRAME_IDE
     };
     memcpy(tx_frame.data, canard_frame->data, sizeof(canard_frame->data));
+    LOG_DBG("Copied");
 
-    int ret = can_send(can_dev, &tx_frame, K_MSEC(100), NULL, NULL);
+    int ret = can_send(can_dev, &tx_frame, K_MSEC(100), can_send_callback, NULL);
+    LOG_DBG("After can send");
 
     if (ret != 0) {
         LOG_DBG("Failed to send can message %d", ret);
@@ -304,6 +308,9 @@ void canard_raw_esc_cmd_broadcast(int16_t raw_cmd[8]) {
                             CANARD_TRANSFER_PRIORITY_HIGH,
                             buffer,
                             (uint16_t)payload_size);
+
+    LOG_DBG("Sent the canard frame to the queue");
+
     if (r < 0) {
         LOG_DBG("CANARD BROADCAST FAILED: %d", r);
     } else {
@@ -389,24 +396,31 @@ void canard_broadcast_thread(void *arg1, void *arg2, void *arg3) {
         // The counter basically acts as a tiemout so that this while loop
         // doesn't lock the mutex too long
         int counter = 0;
+        LOG_DBG("Here");
         while (tx_frame && counter < 5) {
             uint8_t id = tx_frame->id >> 16;
+            LOG_DBG("id");
             if (id == UAVCAN_PROTOCOL_GETNODEINFO_RESPONSE_ID) {
                 // LOG_DBG("Sending GET NODE INFO RESPONSE %u", id);
-		// Hela sus fix: for some reason this message bricks the code
-		// sometimes, so I'm discarding this message
-		canardPopTxQueue(&canard_ins);
-		tx_frame = canardPeekTxQueue(&canard_ins);
-		continue;
+        // Hela sus fix: for some reason this message bricks the code
+        // sometimes, so I'm discarding this message
+        canardPopTxQueue(&canard_ins);
+        tx_frame = canardPeekTxQueue(&canard_ins);
+        continue;
             } else if (id == UAVCAN_PROTOCOL_NODESTATUS_ID) {
                 // LOG_DBG("Sending node status RESPONSE %u", id);
-
             }
+            LOG_DBG("if");
             can_send_canard_frame(tx_frame);
+            LOG_DBG("can send");
             canardPopTxQueue(&canard_ins);
+            LOG_DBG("pop queue");
             tx_frame = canardPeekTxQueue(&canard_ins);
+            LOG_DBG("tx frame");
             counter++;
+            LOG_DBG("counter");
         }
+        LOG_DBG("Unlocked");
         k_mutex_unlock(&canard_tx_queue_mutex);
         k_yield();
     }
@@ -523,4 +537,3 @@ K_THREAD_DEFINE(canard_broadcast_thread_id, 4096,
 K_THREAD_DEFINE(can_rx_frame_handle_thread_id, 4096,
                 can_rx_frame_handle_thread, NULL, NULL, NULL,
                 K_LOWEST_APPLICATION_THREAD_PRIO, 0, 0);
-
