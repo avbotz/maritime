@@ -88,6 +88,7 @@ For the WitMotion, if something is going weird:
 - Click Config -> Reset
 - Exit Config and reenter Config (for changes to update in the menu)
 - Click 6 axis mode to not use magnetometer (because magnetic fields make the reading drift and wobble heavy)
+- Use vertical mode (instead of horizontal) for more gyro stability
 - Make the output rate 100 Hz so that we get lots of data for the microcontroller to use and make PID adjustments fast to make the sub move smooth in the water (or else the sub might wobble back and forth on the yaw axis.)
 - Set the serial baud rate to 115200
 - Make sure changes are saved and then exit.
