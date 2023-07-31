@@ -58,7 +58,7 @@ void process_frame() {
         // Witmotion ahrs uses ENU coordinate system, convert to NED system in rads
         ahrs_data.yaw = -(float) deg_to_rad(stcAngle.Angle[2] / 32768. * 180);
         ahrs_data.pitch = -(float) deg_to_rad(stcAngle.Angle[1] / 32768. * 180);
-        ahrs_data.roll = (float) deg_to_rad(stcAngle.Angle[0] / 32768. * 180) + 90;
+        ahrs_data.roll = (float) deg_to_rad(stcAngle.Angle[0] / 32768. * 180 + 90);
 
         dt_us = time_us() - ahrs_time;
 
