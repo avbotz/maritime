@@ -4,6 +4,7 @@
     /* Grabber and shooter servos are ser-110x model */
     dropper_servo: dropper_servo {
         compatible = "pwm-servo";
+        /* Timer 2 channel 1 (pwm2/1) = pwm2 1 */
         pwms = <&pwm2 1 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
         min-pulse = <PWM_USEC(850)>;
         max-pulse = <PWM_USEC(2100)>; /* This sus value works */
@@ -23,11 +24,80 @@
         min-pulse = <PWM_USEC(850)>;
         max-pulse = <PWM_USEC(2250)>;
     };
+
+    /* Use pwm to control the thruster electronic speed controllers */
+    thr0_esc: thr0_esc {
+        compatible = "pwm-servo";
+        pwms = <&thr0_pwm 1 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        min-pulse = <PWM_USEC(1100)>;
+        max-pulse = <PWM_USEC(1900)>;
+    };
+
+    thr1_esc: thr1_esc {
+        compatible = "pwm-servo";
+        pwms = <&thr1_pwm 4 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        min-pulse = <PWM_USEC(1100)>;
+        max-pulse = <PWM_USEC(1900)>;
+    };
+
+    thr2_esc: thr2_esc {
+        compatible = "pwm-servo";
+        pwms = <&thr2_pwm 1 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        min-pulse = <PWM_USEC(1100)>;
+        max-pulse = <PWM_USEC(1900)>;
+    };
+
+    thr3_esc: thr3_esc {
+        compatible = "pwm-servo";
+        /* pwm12 is defined by default on pin pb14 */
+        pwms = <&pwm12 1 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        min-pulse = <PWM_USEC(1100)>;
+        max-pulse = <PWM_USEC(1900)>;
+    };
+
+    thr4_esc: thr4_esc {
+        compatible = "pwm-servo";
+        pwms = <&thr4_pwm 1 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        min-pulse = <PWM_USEC(1100)>;
+        max-pulse = <PWM_USEC(1900)>;
+    };
+
+    thr5_esc: thr5_esc {
+        compatible = "pwm-servo";
+        pwms = <&thr5_pwm 1 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        min-pulse = <PWM_USEC(1100)>;
+        max-pulse = <PWM_USEC(1900)>;
+    };
+
+    thr6_esc: thr6_esc {
+        compatible = "pwm-servo";
+        pwms = <&thr6_pwm 1 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        min-pulse = <PWM_USEC(1100)>;
+        max-pulse = <PWM_USEC(1900)>;
+    };
+
+    thr7_esc: thr7_esc {
+        compatible = "pwm-servo";
+        pwms = <&thr7_pwm 1 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        min-pulse = <PWM_USEC(1100)>;
+        max-pulse = <PWM_USEC(1900)>;
+    };
 };
 
 /* Define timers for the pwm; pwm12 is already defined on pin pb14 by default
  * in zephyr's Nucleo f767zi dts file on their github.
  */
+&timers1{
+    st,prescaler = <10000>;
+    status = "okay";
+
+    thr0_pwm: pwm {
+        status = "okay";
+        pinctrl-0 = <&tim1_ch1_pa8>;
+        pinctrl-names = "default";
+    };
+};
+
 &timers2{
     st,prescaler = <10000>;
     status = "okay";
@@ -57,6 +127,72 @@
     pwm4: pwm {
         status = "okay";
         pinctrl-0 = <&tim4_ch2_pb7>;
+        pinctrl-names = "default";
+    };
+};
+
+&timers5{
+    st,prescaler = <10000>;
+    status = "okay";
+
+    thr1_pwm: pwm {
+        status = "okay";
+        pinctrl-0 = <&tim5_ch4_pa3>;
+        pinctrl-names = "default";
+    };
+};
+
+&timers8{
+    st,prescaler = <10000>;
+    status = "okay";
+
+    thr2_pwm: pwm {
+        status = "okay";
+        pinctrl-0 = <&tim8_ch1_pc6>;
+        pinctrl-names = "default";
+    };
+};
+
+&timers14{
+    st,prescaler = <10000>;
+    status = "okay";
+
+    thr4_pwm: pwm {
+        status = "okay";
+        pinctrl-0 = <&tim14_ch1_pa7>;
+        pinctrl-names = "default";
+    };
+};
+
+&timers15{
+    st,prescaler = <10000>;
+    status = "okay";
+
+    thr5_pwm: pwm {
+        status = "okay";
+        pinctrl-0 = <&tim15_ch1_pa2>;
+        pinctrl-names = "default";
+    };
+};
+
+&timers16{
+    st,prescaler = <10000>;
+    status = "okay";
+
+    thr6_pwm: pwm {
+        status = "okay";
+        pinctrl-0 = <&tim16_ch1_pf6>;
+        pinctrl-names = "default";
+    };
+};
+
+&timers17{
+    st,prescaler = <10000>;
+    status = "okay";
+
+    thr7_pwm: pwm {
+        status = "okay";
+        pinctrl-0 = <&tim17_ch1_pf7>;
         pinctrl-names = "default";
     };
 };
@@ -118,12 +254,14 @@
     status = "okay";
 };
 
+/*
 &uart7 {
     pinctrl-0 = <&uart7_tx_pf7 &uart7_rx_pf6>;
     pinctrl-names = "default";
     current-speed = <115200>;
     status = "okay";
 };
+*/
 
 
 /*

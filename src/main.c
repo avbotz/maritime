@@ -32,7 +32,7 @@
 #define UART_DEVICE_NODE DT_CHOSEN(zephyr_shell_uart)
 
 #define MSG_SIZE 256
-#define PAUSE_TIME 5000.0
+#define PAUSE_TIME 7000.0
 
 LOG_MODULE_REGISTER(LOG_LEVEL_INF);
 

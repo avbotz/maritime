@@ -7,7 +7,7 @@
 
 #include "servo.h"
 
-LOG_MODULE_REGISTER(servos, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(servos, LOG_LEVEL_INF);
 
 static const struct pwm_dt_spec dropper_servo = PWM_DT_SPEC_GET(DT_NODELABEL(dropper_servo));
 static const struct pwm_dt_spec grabber_servo = PWM_DT_SPEC_GET(DT_NODELABEL(grabber_servo));
