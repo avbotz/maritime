@@ -23,9 +23,10 @@ static const struct adc_dt_spec adc_channels[] = {
 };
 
 static const struct adc_dt_spec adc_channel = adc_channels[0];
-
+    
 int setup_pressure() {
-/*    static struct sensor_value oversampling_rate = { 8192, 0 };
+/*
+    static struct sensor_value oversampling_rate = { 8192, 0 };
     LOG_DBG("Setting up pressure");
     if (dev == NULL) {
         LOG_ERR("Could not find MS5837 device, aborting test.");
@@ -44,7 +45,8 @@ int setup_pressure() {
                 oversampling_rate.val1);
         return -1;
     }
-*/    return 0;
+*/
+    return 0;
 }
 
 void pressure_thread(void *arg1, void *arg2, void *arg3){
@@ -80,7 +82,6 @@ void pressure_thread(void *arg1, void *arg2, void *arg3){
     }
     initial_sample /= num_samples;
 
-    // Take a second sample for accuracy
     initial_sample = 0;
     
     for (int i = 0; i < num_samples; i++)
@@ -96,15 +97,17 @@ void pressure_thread(void *arg1, void *arg2, void *arg3){
     }
     initial_sample /= num_samples;
 
+    mean_sample = initial_sample;
+
     while (1) 
     {
-	for (int i = 0; i < num_samples; i++)
-	{
+        for (int i = 0; i < num_samples; i++)
+        {
             // Read integer (no units) that is proportional with pressure
             uint16_t buf;
             struct adc_sequence sequence = {
                 .buffer = &buf,
-                /* buffer size in bytes, not number of samples */
+                // buffer size in bytes, not number of samples 
                 .buffer_size = sizeof(buf),
             };
 
@@ -112,17 +115,8 @@ void pressure_thread(void *arg1, void *arg2, void *arg3){
 
             adc_read(adc_channel.dev, &sequence);
             
-            // Initialize the first sample
-            if (mean_sample < 0)
-            {
-                mean_sample = buf;
-                LOG_DBG("Took initial sample of %i", buf);
-            }
-            else
-            {
-                mean_sample += sample_weight * (buf - mean_sample);
-            }
-	}
+            mean_sample += sample_weight * (buf - mean_sample);
+        }
         
         // Get atmospheric pressure to base relative depth off of
         if (initial_sample < 0)
@@ -134,7 +128,7 @@ void pressure_thread(void *arg1, void *arg2, void *arg3){
         float depth = 0.000136 * (mean_sample - initial_sample);
 
         pressure_data.depth = depth;
-	while (k_msgq_put(&pressure_data_msgq, &pressure_data, K_NO_WAIT) != 0) {
+        while (k_msgq_put(&pressure_data_msgq, &pressure_data, K_NO_WAIT) != 0) {
             k_msgq_put(&pressure_data_msgq, &pressure_data, K_NO_WAIT);
         }
 
@@ -147,6 +141,7 @@ void pressure_thread(void *arg1, void *arg2, void *arg3){
 
     return;
 }
+
 
 K_THREAD_DEFINE(pressure_thread_id, 4096,
                 pressure_thread, NULL, NULL, NULL,

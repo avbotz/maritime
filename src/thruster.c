@@ -20,7 +20,7 @@
 
 #include "thruster.h"
 
-LOG_MODULE_REGISTER(uavcan, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(uavcan, LOG_LEVEL_DBG);
 
 /*
  * TODO: 
@@ -31,7 +31,7 @@ LOG_MODULE_REGISTER(uavcan, LOG_LEVEL_INF);
 
 //ZZ LOG_MODULE_REGISTER(uavcan, LOG_LEVEL_DBG);
 
-const static struct device *can_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_canbus));
+const static struct device *can_dev = DEVICE_DT_GET(DT_NODELABEL(can1));
 
 int ret;
 
@@ -308,6 +308,9 @@ void canard_raw_esc_cmd_broadcast(int16_t raw_cmd[8]) {
                             CANARD_TRANSFER_PRIORITY_HIGH,
                             buffer,
                             (uint16_t)payload_size);
+
+    LOG_DBG("Sent the canard frame to the queue");
+
     if (r < 0) {
         LOG_DBG("CANARD BROADCAST FAILED: %d", r);
     } else {
@@ -399,11 +402,11 @@ void canard_broadcast_thread(void *arg1, void *arg2, void *arg3) {
             LOG_DBG("id");
             if (id == UAVCAN_PROTOCOL_GETNODEINFO_RESPONSE_ID) {
                 // LOG_DBG("Sending GET NODE INFO RESPONSE %u", id);
-		// Hela sus fix: for some reason this message bricks the code
-		// sometimes, so I'm discarding this message
-		canardPopTxQueue(&canard_ins);
-		tx_frame = canardPeekTxQueue(&canard_ins);
-		continue;
+        // Hela sus fix: for some reason this message bricks the code
+        // sometimes, so I'm discarding this message
+        canardPopTxQueue(&canard_ins);
+        tx_frame = canardPeekTxQueue(&canard_ins);
+        continue;
             } else if (id == UAVCAN_PROTOCOL_NODESTATUS_ID) {
                 // LOG_DBG("Sending node status RESPONSE %u", id);
             }
@@ -522,6 +525,9 @@ void can_send_msg(uint8_t cnt, uint8_t id) {
 void send_thrusts(float thrusts[8]) {
     int16_t raw_cmd[8];
     for (int i = 0; i < 8; ++i) {
+        // Check for nan
+        if (thrusts[i] != thrusts[i])
+            return;
         raw_cmd[i] = 8191 * thrusts[i];
     }
     canard_raw_esc_cmd_broadcast(raw_cmd);
@@ -534,4 +540,3 @@ K_THREAD_DEFINE(canard_broadcast_thread_id, 4096,
 K_THREAD_DEFINE(can_rx_frame_handle_thread_id, 4096,
                 can_rx_frame_handle_thread, NULL, NULL, NULL,
                 K_LOWEST_APPLICATION_THREAD_PRIO, 0, 0);
-
