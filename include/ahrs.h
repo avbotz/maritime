@@ -3,12 +3,19 @@
 
 #include <zephyr/kernel.h>
 
-#define AHRS_OUTPUT_RATE 50 
+#include <stdint.h>
+
+// AHRS output rate in Hz
+#define AHRS_OUTPUT_RATE 50
+
+// Total bytes the message can store
+#define MSG_SZ 512
 
 int setup_ahrs(void);
 extern struct k_msgq ahrs_data_msgq;
 
 struct ahrs_data_s {
+    uint32_t ts_us;
     float yaw;
     float pitch;
     float roll;
