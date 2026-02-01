@@ -14,9 +14,10 @@ cd maritime
 ## Compiling
 
 ```sh
-./compile.sh (local compile)
-./comms.sh   (init serial communication)
-./flash.sh   (flashes microcontroller)
+./source setup.sh   (init terminal)
+west build -b BOARD (local compile)
+./comms.sh          (init serial communication)
+west flash          (flashes microcontroller)
 ```
 
 ## Startup
@@ -50,8 +51,18 @@ After building and flashing, run tmux in a terminal. Split the tmux window into 
 | f %f                | Close grabber.       | N/A               |
 | o %i %i             | Shoot torpedo.       | N/A               |
 | #                   | Sub depth.           | N/A               |
-| q                   | Start DVL relay.     | N/A               |
-| j                   | Stop DVL relay.      | N/A               |
++---------------------+----------------------+-------------------+
+
+V2
++---------------------+----------------------+-------------------+
+|        Input        |     Description      |      Output       |
++---------------------+----------------------+-------------------+
+| a                   | Kill switch (1=on).  | %i                |
+| p                   | Ping robot           | Pong              |
+| t %f %f %f %f %f %f | Set thrusts.         | N/A               |
+| g %i %i             | Drop marker.         | N/A               |
+| f %f                | Close grabber.       | N/A               |
+| o %i %i             | Shoot torpedo.       | N/A               |
 +---------------------+----------------------+-------------------+
 ```
 Each 6 %f's represent a state, or sub position. The order of the numbers is

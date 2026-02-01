@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "browse": {
+                "databaseFilename": "${workspaceFolder}/.vscode/browse.vc.db",
+                "limitSymbolsToIncludedHeaders": false
+            },
+            "includePath": [
+                "${userHome}/Desktop/AVBotz/maritime/include/**",
+                "${userHome}/zephyrproject/zephyr/**",
+                "${userHome}/zephyr-sdk-0.17.4/arm-zephyr-eabi/lib/gcc/**",
+                "${workspaceFolder}/build/zephyr/include/**"
+            ],
+            "name": "maritime",
+            "intelliSenseMode": "gcc-arm",
+            "compilerPath": "${userHome}/zephyr-sdk-0.17.4/arm-zephyr-eabi/bin/arm-zephyr-eabi-gcc",
+            "cStandard": "gnu11",
+            "cppStandard": "c++17"
+        }
+    ],
+    "version": 4
+}

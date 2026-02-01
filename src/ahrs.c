@@ -42,8 +42,8 @@ void process_frame() {
 
     while (true) {
         for (int i=0; i<11; i++) {
-            printk("%02X ", ucRxBuffer[i]);
-        }
+		// printk("%02X ", ucRxBuffer[i]);
+	}
 
         // Witmotion ahrs uses ENU coordinate system, convert to NED system in rads
         ahrs_data.yaw = -deg_to_rad(stcAngle.Angle[2] / 32768. * 180);
