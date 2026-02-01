@@ -27,7 +27,7 @@ With necessary flags that its device initialization would need.
                     gpios = <&gpioh 1 GPIO_ACTIVE_HIGH>;
                     label = "Killswitch modeled as a button";
                 };
-            };  
+            };
         };
 
     ```
@@ -71,13 +71,13 @@ The relay is connected to a GPIO pin on the microcontroller. To trigger the rela
 ## AHRS
 * The AHRS, or Attitude and Heading Reference System, consists of a 6-axis IMU and a 3-axis magnetometer. The IMU returns angular velocity and angular acceleration across all 3 axes, and the magnetometer returns the attitude (yaw, pitch, roll).
 
-* Currently, we are only using the gyroscope and accelerometer on the AHRS because the magnetometer (compass) is heavily affected by electromagnetic interference when we are running the thrusters. 
+* Currently, we are only using the gyroscope and accelerometer on the AHRS because the magnetometer (compass) is heavily affected by electromagnetic interference when we are running the thrusters.
 
 * We are interested in angular velocity and attitude.
 
 * We use the WitMotion WT901, which communicates with the microcontroller over UART. See their documentation for the format of the strings they send.
 
-* To read data coming in from the AHRS, the process is similar to that of the DVL, except it parses the AHRS string which has a different format. 
+* To read data coming in from the AHRS, the process is similar to that of the DVL, except it parses the AHRS string which has a different format.
 
 * Sometimes, the AHRS' angle sensor will drift. When this happens, boot into the Witmotion windows software:
 For the WitMotion, if something is going weird:

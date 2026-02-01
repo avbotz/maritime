@@ -6,7 +6,7 @@
     /* Grabber and shooter servos are ser-110x model */
     dropper_servo: dropper_servo {
         compatible = "pwm-servo";
-        pwms = <&pwm 0 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        pwms = <&pwm 12 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
         min-pulse = <PWM_USEC(850)>;
         max-pulse = <PWM_USEC(2100)>; /* This sus value works */
     };
@@ -14,14 +14,14 @@
     /* The grabber servo is the ser-120x model */
     grabber_servo: grabber_servo {
         compatible = "pwm-servo";
-        pwms = <&pwm 1 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        pwms = <&pwm 10 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
         min-pulse = <PWM_USEC(800)>;
         max-pulse = <PWM_USEC(2100)>;
     };
 
     shooter_servo: shooter_servo {
         compatible = "pwm-servo";
-        pwms = <&pwm 2 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        pwms = <&pwm 11 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
         min-pulse = <PWM_USEC(850)>;
         max-pulse = <PWM_USEC(2250)>;
     };
@@ -35,9 +35,35 @@
             label = "Killswitch modeled as a button";
         };
     };
-};
 
-/ {
+    thrusters {
+        compatible = "pwm-leds";
+        thruster0: thruster0 {
+            pwms = <&pwm 0 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        };
+        thruster1: thruster1 {
+            pwms = <&pwm 1 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        };
+        thruster2: thruster2 {
+            pwms = <&pwm 2 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        };
+        thruster3: thruster3 {
+            pwms = <&pwm 3 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        };
+        thruster4: thruster4 {
+            pwms = <&pwm 6 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        };
+        thruster5: thruster5 {
+            pwms = <&pwm 7 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        };
+        thruster6: thruster6 {
+            pwms = <&pwm 8 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        };
+        thruster7: thruster7 {
+            pwms = <&pwm 9 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        };
+    };
+
     chosen {
         zephyr,console = &cdc_acm_uart0;
     };
