@@ -1,3 +1,5 @@
+.vscode/*  # ignores additional temporary files vscode generates
+
 /.west
 /bootloader
 /modules
@@ -6,4 +8,3 @@
 /build
 /maritime_ec
 *.swp
-
