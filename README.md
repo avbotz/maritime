@@ -17,7 +17,7 @@ cd maritime
 ./source setup.sh   (init terminal)
 west build -b BOARD (local compile)
 ./comms.sh          (init serial communication)
-west flash          (flashes microcontroller)
+west flash -r uf2   (flashes microcontroller)
 ```
 
 ## Startup
@@ -58,7 +58,7 @@ V2
 |        Input        |     Description      |      Output       |
 +---------------------+----------------------+-------------------+
 | a                   | Kill switch (1=on).  | %i                |
-| p                   | Ping robot           | Pong              |
+| p                   | Ping robot           | pong              |
 | t %f %f %f %f %f %f | Set thrusts.         | N/A               |
 | g %i %i             | Drop marker.         | N/A               |
 | f %f                | Close grabber.       | N/A               |
