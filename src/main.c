@@ -4,6 +4,10 @@
 #include <zephyr/drivers/uart.h>
 #include <zephyr/logging/log.h>
 
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
 LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
 BUILD_ASSERT(DT_NODE_HAS_COMPAT(DT_CHOSEN(zephyr_console), zephyr_cdc_acm_uart),
@@ -49,6 +53,10 @@ int main(void)
 
 	uart_irq_callback_user_data_set(usb_device, uart_rx_handler, NULL);
 	uart_irq_rx_enable(usb_device);
+	setup_killswitch();
+	// setup_ahrs();
+	setup_thrusters();
+	setup_servos();
 
 	char msg[MSG_SIZE];
 
@@ -56,14 +64,40 @@ int main(void)
 		if (k_msgq_get(&uart_msgq, msg, K_FOREVER) == 0) {
 			char *save_ptr;
 			char *token = strtok_r(msg, " ", &save_ptr);
+			if (!token) {
+				continue;
+			}
 			char c = token[0];
 
 			if (c == 'a') {
-				printk("alive\n");
-			} else if (c == 'b') {
-				printk("test\n");
+				printk(alive() ? "alive\n" : "not alive\n");
 			} else if (c == 'p') {
 				printk("pong\n");
+			} else if (c == 't') {
+				float thrusts[8];
+				for (int i = 0; i < 8; i++) {
+					token = strtok_r(NULL, " ", &save_ptr);
+					if (token) {
+						thrusts[i] = strtof(token, NULL);
+					} else {
+						thrusts[i] = 0.0f;
+					}
+					printf("%s_g %f\n", token ? token : "0",
+					       (double)thrusts[i]);
+				}
+
+				send_thrusts(thrusts);
+				printk("sent thrusts\n");
+			} else if (c == 'g') {
+				// grabber
+				grab(strtof(strtok_r(NULL, " ", &save_ptr), NULL));
+			} else if (c == 'd') {
+				// dropper
+				int idx = atoi(strtok_r(NULL, " ", &save_ptr));
+				int value = atoi(strtok_r(NULL, " ", &save_ptr));
+				drop(idx, value);
+			} else if (c == 's') {
+				shoot(strtof(strtok_r(NULL, " ", &save_ptr), NULL));
 			} else {
 				LOG_WRN("Unknown command: %c", c);
 			}

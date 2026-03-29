@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -59,10 +58,12 @@ void send_thrusts(float thrusts[8])
 		uint32_t pulse_width =
 			(uint32_t)((thrust + 1.0f) * (thruster_max_pulse - thruster_min_pulse) / 2 +
 				   thruster_min_pulse);
+		printf("Setting thruster %d to pulse width %u us\n", i, pulse_width);
 
-		int ret = pwm_set_pulse_dt(thruster_devices[i], pulse_width);
+		int ret = pwm_set_pulse_dt(thruster_devices[i], PWM_USEC(pulse_width));
 		if (ret < 0) {
 			LOG_DBG("Failed to set pulse for thruster %d, error code %i", i, ret);
 		}
+		k_sleep(K_SECONDS(2));
 	}
 };

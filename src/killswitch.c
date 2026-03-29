@@ -18,7 +18,7 @@ bool alive() {
     // SUB is ALIVE when state is 0
     bool status = current_state == 0;
 
-    if (status) {
+    if (!status) {
 	    float new_thrusts[8] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
 	    send_thrusts(new_thrusts);
     }
