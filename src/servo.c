@@ -63,9 +63,9 @@ void setup_servos()
 	}
 }
 
-void drop(int idx, int value)
+void drop(int value)
 {
-	LOG_DBG("Drop for %i %i", idx, value);
+	LOG_DBG("Drop for %i", value);
 	// If requested, set servo to neutral position
 	if (value == 0) {
 		pwm_set_pulse_dt(&dropper_servo, dropper_mid_pulse);
@@ -73,21 +73,6 @@ void drop(int idx, int value)
 		// Drop both balls at the same time
 		pwm_set_pulse_dt(&dropper_servo, dropper_max_pulse);
 	}
-	/*
-	else if (value == 1)
-	{
-		// Set servo to drop the 0th (right) ball
-		if (idx == 0)
-		{
-			pwm_set_pulse_dt(&dropper_servo, dropper_max_pulse);
-		}
-		// Set servo to drop the 1st (left) ball
-		else if (idx == 1)
-		{
-			pwm_set_pulse_dt(&dropper_servo, dropper_min_pulse);
-		}
-	}
-	*/
 }
 
 void grab(float value)

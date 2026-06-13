@@ -59,10 +59,10 @@ V2
 +---------------------+----------------------+-------------------+
 | a                   | Kill switch (1=on).  | %i                |
 | p                   | Ping robot           | pong              |
-| t %f %f %f %f %f %f | Set thrusts.         | N/A               |
-| g %i %i             | Drop marker.         | N/A               |
+| t %i %f             | Set thruster id val. | N/A               |
+| d %i                | Dropper 0/1.         | N/A               |
 | f %f                | Close grabber.       | N/A               |
-| o %i %i             | Shoot torpedo.       | N/A               |
+| o %i %i             | Torpedo id 0/1.      | N/A               |
 +---------------------+----------------------+-------------------+
 ```
 Each 6 %f's represent a state, or sub position. The order of the numbers is

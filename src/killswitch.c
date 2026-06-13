@@ -19,8 +19,9 @@ bool alive() {
     bool status = current_state == 0;
 
     if (!status) {
-	    float new_thrusts[8] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
-	    send_thrusts(new_thrusts);
+	    for (int i = 0; i < 8; i++) {
+		    (void)send_thrusts(i, 0.0f);
+	    }
     }
     return status;
 }

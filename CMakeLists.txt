@@ -10,4 +10,4 @@ target_include_directories(app PRIVATE include/)
 # )
 
 # target_sources(app PRIVATE ${app_sources})
-target_sources(app PRIVATE src/main.c src/ahrs.c src/killswitch.c src/servo.c src/thruster.c src/util.c)
+target_sources(app PRIVATE src/main.c src/ahrs.c src/killswitch.c src/servo.c src/thruster.c src/usb.c src/util.c)

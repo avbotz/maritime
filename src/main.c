@@ -1,106 +1,136 @@
 #include <zephyr/kernel.h>
-#include <zephyr/sys/printk.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/drivers/uart.h>
 #include <zephyr/logging/log.h>
 
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
+
+#include "killswitch.h"
+#include "servo.h"
+#include "thruster.h"
+#include "util.h"
+#include "usb.h"
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
-BUILD_ASSERT(DT_NODE_HAS_COMPAT(DT_CHOSEN(zephyr_console), zephyr_cdc_acm_uart),
-	     "Console device is not ACM CDC UART device");
-
-static const struct device *usb_device = DEVICE_DT_GET(DT_CHOSEN(zephyr_console));
-
 #define MSG_SIZE 256
-K_MSGQ_DEFINE(uart_msgq, MSG_SIZE, 10, 1);
+#define RESPONSE_SIZE 128
 
-static char rx_buf[MSG_SIZE];
-static size_t rx_pos = 0;
-
-static void uart_rx_handler(const struct device *dev, void *user_data)
+static bool has_args(const char *args, int count)
 {
-	ARG_UNUSED(user_data);
+	bool in_token = false;
+	int found = 0;
 
-	uint8_t c;
-
-	while (uart_irq_update(dev) && uart_irq_is_pending(dev)) {
-		if (uart_irq_rx_ready(dev)) {
-			uart_fifo_read(dev, &c, 1);
-
-			if ((c == '\n' || c == '\r') && rx_pos > 0) {
-				rx_buf[rx_pos] = '\0';
-				k_msgq_put(&uart_msgq, rx_buf, K_NO_WAIT);
-				rx_pos = 0;
-			} else if (rx_pos < MSG_SIZE - 1) {
-				rx_buf[rx_pos++] = (char)c;
-			} else {
-				rx_pos = 0;
+	while (*args != '\0') {
+		if (*args == ' ') {
+			in_token = false;
+		} else if (!in_token) {
+			in_token = true;
+			found++;
+			if (found >= count) {
+				return true;
 			}
 		}
+		args++;
+	}
+
+	return false;
+}
+
+static void handle_command(char *msg, char *response, size_t response_size)
+{
+	char *save_ptr;
+	char *token = strtok_r(msg, " ", &save_ptr);
+
+	if (!token) {
+		snprintf(response, response_size, "error empty command\n");
+		return;
+	}
+
+	char c = token[0];
+
+	if (c == 'a') {
+		snprintf(response, response_size, alive() ? "alive\n" : "not alive\n");
+	} else if (c == 'p') {
+		snprintf(response, response_size, "pong\n");
+	} else if (c == 't') {
+		if (!has_args(save_ptr, 2)) {
+			snprintf(response, response_size,
+				 "error thrust command needs idx and value\n");
+			return;
+		}
+
+		int idx = parse_int(" ", &save_ptr);
+		float value = parse_float(" ", &save_ptr);
+		int ret = send_thrusts(idx, value);
+
+		if (ret < 0) {
+			snprintf(response, response_size,
+				 "error set thruster failed\n");
+			return;
+		}
+
+		snprintf(response, response_size, "set thruster\n");
+	} else if (c == 'g') {
+		if (!has_args(save_ptr, 1)) {
+			snprintf(response, response_size,
+				 "error grab command needs value\n");
+			return;
+		}
+
+		float value = parse_float(" ", &save_ptr);
+
+		grab(value);
+		snprintf(response, response_size, "set grabber\n");
+	} else if (c == 'd') {
+		if (!has_args(save_ptr, 1)) {
+			snprintf(response, response_size,
+				 "error drop command needs value\n");
+			return;
+		}
+
+		int value = parse_int(" ", &save_ptr);
+
+		drop(value);
+		snprintf(response, response_size, "set dropper\n");
+	} else if (c == 'o') {
+		if (!has_args(save_ptr, 2)) {
+			snprintf(response, response_size,
+				 "error torpedo command needs id and value\n");
+			return;
+		}
+
+		int idx = parse_int(" ", &save_ptr);
+		int value = parse_int(" ", &save_ptr);
+
+		shoot(idx, value);
+		snprintf(response, response_size, "set torpedo\n");
+	} else {
+		LOG_WRN("Unknown command: %c", c);
+		snprintf(response, response_size, "error unknown command\n");
 	}
 }
 
 int main(void)
 {
-	if (!device_is_ready(usb_device)) {
-		LOG_ERR("CDC ACM device not ready");
+	if (setup_usb() != 0) {
+		LOG_ERR("USB setup failed");
 		return -1;
 	}
 
-	uart_irq_callback_user_data_set(usb_device, uart_rx_handler, NULL);
-	uart_irq_rx_enable(usb_device);
 	setup_killswitch();
 	// setup_ahrs();
 	setup_thrusters();
 	setup_servos();
 
 	char msg[MSG_SIZE];
+	char response[RESPONSE_SIZE];
 
 	while (true) {
-		if (k_msgq_get(&uart_msgq, msg, K_FOREVER) == 0) {
-			char *save_ptr;
-			char *token = strtok_r(msg, " ", &save_ptr);
-			if (!token) {
-				continue;
-			}
-			char c = token[0];
-
-			if (c == 'a') {
-				printk(alive() ? "alive\n" : "not alive\n");
-			} else if (c == 'p') {
-				printk("pong\n");
-			} else if (c == 't') {
-				float thrusts[8];
-				for (int i = 0; i < 8; i++) {
-					token = strtok_r(NULL, " ", &save_ptr);
-					if (token) {
-						thrusts[i] = strtof(token, NULL);
-					} else {
-						thrusts[i] = 0.0f;
-					}
-					printf("%s_g %f\n", token ? token : "0",
-					       (double)thrusts[i]);
-				}
-
-				send_thrusts(thrusts);
-				printk("sent thrusts\n");
-			} else if (c == 'g') {
-				// grabber
-				grab(strtof(strtok_r(NULL, " ", &save_ptr), NULL));
-			} else if (c == 'd') {
-				// dropper
-				int idx = atoi(strtok_r(NULL, " ", &save_ptr));
-				int value = atoi(strtok_r(NULL, " ", &save_ptr));
-				drop(idx, value);
-			} else if (c == 's') {
-				shoot(strtof(strtok_r(NULL, " ", &save_ptr), NULL));
-			} else {
-				LOG_WRN("Unknown command: %c", c);
-			}
+		if (usb_recv_ecm_packet(msg, sizeof(msg)) == 0) {
+			handle_command(msg, response, sizeof(response));
+			(void)usb_send_ecm_packet(response);
+		} else {
+			(void)usb_send_ecm_packet("error command too long\n");
 		}
 	}
 
