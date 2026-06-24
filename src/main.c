@@ -1,3 +1,8 @@
+#include "killswitch.h"
+#include "thruster.h"
+#include "thruster.h"
+#include "util.h"
+
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
@@ -54,11 +59,15 @@ int main(void)
 	uart_irq_callback_user_data_set(usb_device, uart_rx_handler, NULL);
 	uart_irq_rx_enable(usb_device);
 	setup_killswitch();
-	// setup_ahrs();
 	setup_thrusters();
-	setup_servos();
+	// setup_servos();
+
+	float init_thrusters[8] = {0.0f};
+
+	send_thrusts(init_thrusters);
 
 	char msg[MSG_SIZE];
+	int64_t prev_alive_time = k_uptime_get();
 
 	while (true) {
 		if (k_msgq_get(&uart_msgq, msg, K_FOREVER) == 0) {
@@ -69,38 +78,18 @@ int main(void)
 			}
 			char c = token[0];
 
-			if (c == 'a') {
-				printk(alive() ? "alive\n" : "not alive\n");
-			} else if (c == 'p') {
-				printk("pong\n");
-			} else if (c == 't') {
-				float thrusts[8];
-				for (int i = 0; i < 8; i++) {
-					token = strtok_r(NULL, " ", &save_ptr);
-					if (token) {
-						thrusts[i] = strtof(token, NULL);
-					} else {
-						thrusts[i] = 0.0f;
-					}
-					printf("%s_g %f\n", token ? token : "0",
-					       (double)thrusts[i]);
-				}
-
-				send_thrusts(thrusts);
-				printk("sent thrusts\n");
-			} else if (c == 'g') {
-				// grabber
-				grab(strtof(strtok_r(NULL, " ", &save_ptr), NULL));
-			} else if (c == 'd') {
-				// dropper
-				int idx = atoi(strtok_r(NULL, " ", &save_ptr));
-				int value = atoi(strtok_r(NULL, " ", &save_ptr));
-				drop(idx, value);
-			} else if (c == 's') {
-				shoot(strtof(strtok_r(NULL, " ", &save_ptr), NULL));
-			} else {
-				LOG_WRN("Unknown command: %c", c);
+			if (c == 'p') {
+			    // should be p <thruster id> <thrust value>
+				int thruster = atoi(strtok_r(NULL, " ", &save_ptr));
+				float thrust = strtof(strtok_r(NULL, " ", &save_ptr), NULL);
+				send_thrust(thruster, thrust);
 			}
+		}
+
+		int64_t current_time = k_uptime_get();
+		if (current_time - prev_alive_time >= 100) {
+			printk(alive() ? "x 1\n" : "x 0\n");
+			prev_alive_time = current_time;
 		}
 	}
 
