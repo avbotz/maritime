@@ -1,6 +1,5 @@
 #include "killswitch.h"
 #include "thruster.h"
-#include "thruster.h"
 #include "util.h"
 
 #include <zephyr/kernel.h>
@@ -79,16 +78,28 @@ int main(void)
 			char c = token[0];
 
 			if (c == 'p') {
-			    // should be p <thruster id> <thrust value>
-				int thruster = atoi(strtok_r(NULL, " ", &save_ptr));
-				float thrust = strtof(strtok_r(NULL, " ", &save_ptr), NULL);
+				char *thruster_token = strtok_r(NULL, " ", &save_ptr);
+				char *thrust_token = strtok_r(NULL, " ", &save_ptr);
+				if (thruster_token == NULL || thrust_token == NULL) {
+					continue;
+				}
+				int thruster = atoi(thruster_token);
+				float thrust = strtof(thrust_token, NULL);
 				send_thrust(thruster, thrust);
+			} else if (c == 'a') {
+				char *thrust_token = strtok_r(NULL, " ", &save_ptr);
+				if (thrust_token == NULL) {
+					continue;
+				}
+				float thrust = strtof(thrust_token, NULL);
+				float thrusts[8] = {thrust, thrust, thrust, thrust, thrust, thrust, thrust, thrust};
+				send_thrusts(thrusts);
 			}
 		}
 
 		int64_t current_time = k_uptime_get();
 		if (current_time - prev_alive_time >= 100) {
-			printk(alive() ? "x 1\n" : "x 0\n");
+			printk(alive() ? "x 0\n" : "x 1\n");
 			prev_alive_time = current_time;
 		}
 	}
