@@ -67,3 +67,21 @@ void send_thrusts(float thrusts[8])
 		k_sleep(K_SECONDS(2));
 	}
 };
+
+void send_thrust(int thruster, float thrust)
+{
+	if (thrust < -1.0f) {
+		thrust = -1.0f;
+	}
+	if (thrust > 1.0f) {
+		thrust = 1.0f;
+	}
+
+	uint32_t pulse_width =
+		(uint32_t)((thrust + 1.0f) * (thruster_max_pulse - thruster_min_pulse) / 2 +
+				   thruster_min_pulse);
+	int ret = pwm_set_pulse_dt(thruster_devices[thruster], PWM_USEC(pulse_width));
+	if (ret < 0) {
+		LOG_DBG("Failed to set pulse for thruster %d, error code %i", thruster, ret);
+	}
+}
