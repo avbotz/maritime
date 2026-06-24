@@ -20,9 +20,31 @@ west build -b BOARD (local compile)
 west flash -r uf2   (flashes microcontroller)
 ```
 
+For the Raspberry Pi Pico target, use:
+
+```sh
+west build -b rpi_pico
+west flash -r uf2
+```
+
 ## Startup
 
 After building and flashing, run tmux in a terminal. Split the tmux window into two panes. Run "cat < /dev/ttyACM*" in one and "cat > /dev/ttyACM*" in the other. The former pane is the DISPLAY pane, it will show the output from maritime. The latter is the COMMAND pane, it is where maritime receives its input.
+
+## Thalassic low-level protocol
+
+The Pico branch supports the text protocol expected by thalassic's `sub_low`
+driver:
+
+```
+p <thruster_id> <thrust>  Set one thruster, where thrust is clamped to [-1, 1].
+a <thrust>                Set all 8 thrusters to the same clamped thrust.
+x <killed>                Published at 10 Hz; 1 means killed, 0 means alive.
+```
+
+The Raspberry Pi Pico overlay maps thrusters to GP0-GP7, the kill switch to
+GP28, and pressure ADC input to GP26. Torpedo, dropper, and depth-report
+commands are not implemented in this branch yet.
 
 ## Commands
 
