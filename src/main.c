@@ -69,7 +69,7 @@ int main(void)
 	int64_t prev_alive_time = k_uptime_get();
 
 	while (true) {
-		if (k_msgq_get(&uart_msgq, msg, K_FOREVER) == 0) {
+		if (k_msgq_get(&uart_msgq, msg, K_NO_WAIT) == 0) {
 			char *save_ptr;
 			char *token = strtok_r(msg, " ", &save_ptr);
 			if (!token) {
@@ -86,6 +86,8 @@ int main(void)
 				int thruster = atoi(thruster_token);
 				float thrust = strtof(thrust_token, NULL);
 				send_thrust(thruster, thrust);
+
+				printk("p %d %d\n", thruster, (int)(thrust * 1000));
 			} else if (c == 'a') {
 				char *thrust_token = strtok_r(NULL, " ", &save_ptr);
 				if (thrust_token == NULL) {
@@ -99,7 +101,7 @@ int main(void)
 
 		int64_t current_time = k_uptime_get();
 		if (current_time - prev_alive_time >= 100) {
-			printk(alive() ? "x 0\n" : "x 1\n");
+			// printk(alive() ? "x 0" : "x 1");
 			prev_alive_time = current_time;
 		}
 	}
