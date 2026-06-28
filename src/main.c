@@ -11,6 +11,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <errno.h>
+#include <stdbool.h>
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
@@ -25,26 +27,71 @@ K_MSGQ_DEFINE(uart_msgq, MSG_SIZE, 10, 1);
 static char rx_buf[MSG_SIZE];
 static size_t rx_pos = 0;
 
+static bool parse_int_arg(char *token, int *value)
+{
+	char *end;
+	long parsed;
+
+	if (token == NULL || token[0] == '\0') {
+		return false;
+	}
+
+	errno = 0;
+	parsed = strtol(token, &end, 10);
+	if (errno != 0 || *end != '\0') {
+		return false;
+	}
+
+	*value = (int)parsed;
+	return true;
+}
+
+static bool parse_float_arg(char *token, float *value)
+{
+	char *end;
+	float parsed;
+
+	if (token == NULL || token[0] == '\0') {
+		return false;
+	}
+
+	errno = 0;
+	parsed = strtof(token, &end);
+	if (errno != 0 || *end != '\0') {
+		return false;
+	}
+
+	*value = parsed;
+	return true;
+}
+
 static void uart_rx_handler(const struct device *dev, void *user_data)
 {
 	ARG_UNUSED(user_data);
 
 	uint8_t c;
 
-	while (uart_irq_update(dev) && uart_irq_is_pending(dev)) {
+	uart_irq_update(dev);
+	while (uart_irq_is_pending(dev)) {
 		if (uart_irq_rx_ready(dev)) {
-			uart_fifo_read(dev, &c, 1);
+			if (uart_fifo_read(dev, &c, 1) != 1) {
+				uart_irq_update(dev);
+				continue;
+			}
 
-			if ((c == '\n' || c == '\r') && rx_pos > 0) {
-				rx_buf[rx_pos] = '\0';
-				k_msgq_put(&uart_msgq, rx_buf, K_NO_WAIT);
-				rx_pos = 0;
+			if (c == '\n' || c == '\r') {
+				if (rx_pos > 0) {
+					rx_buf[rx_pos] = '\0';
+					k_msgq_put(&uart_msgq, rx_buf, K_NO_WAIT);
+					rx_pos = 0;
+				}
 			} else if (rx_pos < MSG_SIZE - 1) {
 				rx_buf[rx_pos++] = (char)c;
 			} else {
 				rx_pos = 0;
 			}
 		}
+		uart_irq_update(dev);
 	}
 }
 
@@ -71,29 +118,34 @@ int main(void)
 	while (true) {
 		if (k_msgq_get(&uart_msgq, msg, K_NO_WAIT) == 0) {
 			char *save_ptr;
-			char *token = strtok_r(msg, " ", &save_ptr);
+			char *token = strtok_r(msg, " \t", &save_ptr);
 			if (!token) {
 				continue;
 			}
 			char c = token[0];
 
 			if (c == 'p') {
-				char *thruster_token = strtok_r(NULL, " ", &save_ptr);
-				char *thrust_token = strtok_r(NULL, " ", &save_ptr);
-				if (thruster_token == NULL || thrust_token == NULL) {
+				char *thruster_token = strtok_r(NULL, " \t", &save_ptr);
+				char *thrust_token = strtok_r(NULL, " \t", &save_ptr);
+				int thruster;
+				float thrust;
+
+				if (!parse_int_arg(thruster_token, &thruster) ||
+				    !parse_float_arg(thrust_token, &thrust)) {
 					continue;
 				}
-				int thruster = atoi(thruster_token);
-				float thrust = strtof(thrust_token, NULL);
+
 				send_thrust(thruster, thrust);
 
 				printk("p %d %d\n", thruster, (int)(thrust * 1000));
 			} else if (c == 'a') {
-				char *thrust_token = strtok_r(NULL, " ", &save_ptr);
-				if (thrust_token == NULL) {
+				char *thrust_token = strtok_r(NULL, " \t", &save_ptr);
+				float thrust;
+
+				if (!parse_float_arg(thrust_token, &thrust)) {
 					continue;
 				}
-				float thrust = strtof(thrust_token, NULL);
+
 				float thrusts[8] = {thrust, thrust, thrust, thrust, thrust, thrust, thrust, thrust};
 				send_thrusts(thrusts);
 			}
