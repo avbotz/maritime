@@ -37,7 +37,7 @@ int setup_thrusters()
 	for (int i = 0; i < 8; i++) {
 		if (!device_is_ready(thruster_devices[i]->dev)) {
 			LOG_DBG("Thruster %d device not ready", i);
-			// return -1;
+			return -1;
 		}
 	}
 	return 0;

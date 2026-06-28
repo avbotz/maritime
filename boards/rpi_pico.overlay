@@ -38,29 +38,29 @@
     };
     thrusters {
         compatible = "pwm-leds";
-        thruster0: thruster0 {            /* pin 7  -> GP5 -> ch5 (slice 2B) */
-            pwms = <&pwm 5 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
-        };
-        thruster1: thruster1 {            /* pin 6  -> GP4 -> ch4 (slice 2A) */
-            pwms = <&pwm 4 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
-        };
-        thruster2: thruster2 {            /* pin 5  -> GP3 -> ch3 (slice 1B) */
-            pwms = <&pwm 3 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
-        };
-        thruster3: thruster3 {            /* pin 4  -> GP2 -> ch2 (slice 1A) */
-            pwms = <&pwm 2 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
-        };
-        thruster4: thruster4 {            /* pin 10 -> GP7 -> ch7 (slice 3B) */
+        thruster0: thruster0 {
             pwms = <&pwm 7 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
         };
-        thruster5: thruster5 {            /* pin 1  -> GP0 -> ch0 (slice 0A) */
+        thruster1: thruster1 {
+            pwms = <&pwm 6 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        };
+        thruster2: thruster2 {
+            pwms = <&pwm 3 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        };
+        thruster3: thruster3 {
+            pwms = <&pwm 2 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        };
+        thruster4: thruster4 {
+            pwms = <&pwm 9 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        };
+        thruster5: thruster5 {
             pwms = <&pwm 0 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
         };
-        thruster6: thruster6 {            /* pin 2  -> GP1 -> ch1 (slice 0B) */
+        thruster6: thruster6 {
             pwms = <&pwm 1 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
         };
-        thruster7: thruster7 {            /* pin 9  -> GP6 -> ch6 (slice 3A) */
-            pwms = <&pwm 6 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        thruster7: thruster7 {
+            pwms = <&pwm 8 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
         };
     };
     chosen {
