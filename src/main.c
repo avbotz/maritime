@@ -1,3 +1,7 @@
+// Need the following line to include strtok_r, as picolibc does not include it by default
+// Seems to build fine though, but I get editor warnings if not included
+#define _POSIX_C_SOURCE 200809L
+
 #include "killswitch.h"
 #include "thruster.h"
 #include "util.h"
@@ -11,7 +15,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <errno.h>
 #include <stdbool.h>
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
@@ -27,43 +30,7 @@ K_MSGQ_DEFINE(uart_msgq, MSG_SIZE, 10, 1);
 static char rx_buf[MSG_SIZE];
 static size_t rx_pos = 0;
 
-static bool parse_int_arg(char *token, int *value)
-{
-	char *end;
-	long parsed;
 
-	if (token == NULL || token[0] == '\0') {
-		return false;
-	}
-
-	errno = 0;
-	parsed = strtol(token, &end, 10);
-	if (errno != 0 || *end != '\0') {
-		return false;
-	}
-
-	*value = (int)parsed;
-	return true;
-}
-
-static bool parse_float_arg(char *token, float *value)
-{
-	char *end;
-	float parsed;
-
-	if (token == NULL || token[0] == '\0') {
-		return false;
-	}
-
-	errno = 0;
-	parsed = strtof(token, &end);
-	if (errno != 0 || *end != '\0') {
-		return false;
-	}
-
-	*value = parsed;
-	return true;
-}
 
 static void uart_rx_handler(const struct device *dev, void *user_data)
 {
@@ -116,17 +83,19 @@ int main(void)
 	int64_t prev_alive_time = k_uptime_get();
 
 	while (true) {
+		LOG_DBG("Recieved command: %s", msg);
+
 		if (k_msgq_get(&uart_msgq, msg, K_NO_WAIT) == 0) {
 			char *save_ptr;
-			char *token = strtok_r(msg, " \t", &save_ptr);
+			char *token = strtok_r(msg, " ", &save_ptr);
 			if (!token) {
 				continue;
 			}
 			char c = token[0];
 
 			if (c == 'p') {
-				char *thruster_token = strtok_r(NULL, " \t", &save_ptr);
-				char *thrust_token = strtok_r(NULL, " \t", &save_ptr);
+				char *thruster_token = strtok_r(NULL, " ", &save_ptr);
+				char *thrust_token = strtok_r(NULL, " ", &save_ptr);
 				int thruster;
 				float thrust;
 
@@ -137,9 +106,9 @@ int main(void)
 
 				send_thrust(thruster, thrust);
 
-				printk("p %d %d\n", thruster, (int)(thrust * 1000));
+				LOG_DBG("Setting thruster power: p %d %d\n", thruster, (int)(thrust * 1000));
 			} else if (c == 'a') {
-				char *thrust_token = strtok_r(NULL, " \t", &save_ptr);
+				char *thrust_token = strtok_r(NULL, " ", &save_ptr);
 				float thrust;
 
 				if (!parse_float_arg(thrust_token, &thrust)) {
@@ -153,7 +122,14 @@ int main(void)
 
 		int64_t current_time = k_uptime_get();
 		if (current_time - prev_alive_time >= 100) {
-			// printk(alive() ? "x 0" : "x 1");
+			bool is_alive = alive();
+
+			printk(is_alive ? "x 0\n" : "x 1\n");
+
+			if (!is_alive) {
+				send_thrusts(init_thrusters);
+			}
+
 			prev_alive_time = current_time;
 		}
 	}

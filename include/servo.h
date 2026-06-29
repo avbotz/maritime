@@ -6,4 +6,4 @@ void drop(int idx, int value);
 void grab(float value);
 void shoot(int idx, int value);
 
-#endif /* SERVO_H */
+#endif /* _MARITIME_SERVO_H */

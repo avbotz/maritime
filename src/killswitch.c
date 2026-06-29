@@ -1,26 +1,23 @@
+#include "killswitch.h"
+
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/logging/log.h>
+
 #include <stdbool.h>
 
-#include "killswitch.h"
-#include "thruster.h"
+LOG_MODULE_REGISTER(killswitch, LOG_LEVEL_DBG);
 
 static const struct gpio_dt_spec killswitch = GPIO_DT_SPEC_GET(DT_NODELABEL(killswitch_button), gpios);
 
 void setup_killswitch() {
-    gpio_pin_configure_dt(&killswitch, GPIO_INPUT);
+    int ret = gpio_pin_configure_dt(&killswitch, GPIO_INPUT);
+    if (ret != 0) {
+        LOG_ERR("Failed to configure killswitch: %d", ret);
+    }
 }
 
 bool alive() {
-    int current_state = gpio_pin_get_dt(&killswitch);
-
-    // SUB is ALIVE when state is 0
-    bool status = current_state == 0;
-
-    if (!status) {
-	    float new_thrusts[8] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
-	    send_thrusts(new_thrusts);
-    }
-    return status;
+    return gpio_pin_get_dt(&killswitch) == 0;
 }

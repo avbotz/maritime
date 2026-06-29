@@ -1,11 +1,12 @@
 /* Servos control the ball dropper, torpedo shooter, grabber */
+#include "servo.h"
+
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/pwm.h>
 #include <zephyr/logging/log.h>
 
-#include "servo.h"
 
 LOG_MODULE_REGISTER(servos, LOG_LEVEL_DBG);
 
