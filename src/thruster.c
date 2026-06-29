@@ -1,8 +1,4 @@
-#include <stdio.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <string.h>
-#include <stdlib.h>
+#include "thruster.h"
 
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
@@ -12,7 +8,8 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/pwm.h>
 
-#include "thruster.h"
+#include <stdbool.h>
+#include <stdint.h>
 
 LOG_MODULE_REGISTER(thrusters, LOG_LEVEL_DBG);
 
@@ -29,8 +26,9 @@ static const struct pwm_dt_spec *thruster_devices[8] = {&thruster0, &thruster1, 
 							&thruster3, &thruster4, &thruster5,
 							&thruster6, &thruster7};
 
-static const uint32_t thruster_min_pulse = 1100;
-static const uint32_t thruster_max_pulse = 1900;
+static const uint32_t THRUSTER_MIN_PULSE = 1100;
+static const uint32_t THRUSTER_MAX_PULSE = 1900;
+static const float MAX_POWER = 0.6;
 
 int setup_thrusters()
 {
@@ -46,22 +44,7 @@ int setup_thrusters()
 void send_thrusts(float thrusts[8])
 {
 	for (int i = 0; i < 8; i++) {
-		float thrust = thrusts[i];
-		if (thrust < -1.0f) {
-			thrust = -1.0f;
-		}
-		if (thrust > 1.0f) {
-			thrust = 1.0f;
-		}
-
-		// Map thrust from [-1.0, 1.0] to [MIN, MAX] microseconds
-		uint32_t pulse_width =
-			(uint32_t)((thrust + 1.0f) * (thruster_max_pulse - thruster_min_pulse) / 2 +
-				   thruster_min_pulse);
-		int ret = pwm_set_pulse_dt(thruster_devices[i], PWM_USEC(pulse_width));
-		if (ret < 0) {
-			LOG_DBG("Failed to set pulse for thruster %d, error code %i", i, ret);
-		}
+		send_thrust(i, thrusts[i]);
 	}
 };
 
@@ -71,16 +54,12 @@ void send_thrust(int thruster, float thrust)
 		return;
 	}
 
-	if (thrust < -1.0f) {
-		thrust = -1.0f;
-	}
-	if (thrust > 1.0f) {
-		thrust = 1.0f;
-	}
+	thrust = clamp(thrust, -MAX_POWER, MAX_POWER);
 
 	uint32_t pulse_width =
-		(uint32_t)((thrust + 1.0f) * (thruster_max_pulse - thruster_min_pulse) / 2 +
-				   thruster_min_pulse);
+		(uint32_t)((thrust + 1.0f) * (THRUSTER_MAX_PULSE - THRUSTER_MIN_PULSE) / 2 +
+				   THRUSTER_MIN_PULSE);
+
 	int ret = pwm_set_pulse_dt(thruster_devices[thruster], PWM_USEC(pulse_width));
 	if (ret < 0) {
 		LOG_DBG("Failed to set pulse for thruster %d, error code %i", thruster, ret);

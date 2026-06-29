@@ -6,4 +6,4 @@
 void setup_killswitch();
 bool alive();
 
-#endif /* KILLSWITCH_H */
+#endif /* _MARITIME_KILLSWITCH_H */

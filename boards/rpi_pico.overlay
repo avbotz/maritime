@@ -1,10 +1,6 @@
 #include <zephyr/dt-bindings/adc/adc.h>
 
 / {
-    aliases {
-        ahrsuart = &uart1;
-    };
-
     /* Grabber and shooter servos are ser-110x model */
     /* dropper_servo: dropper_servo {
         compatible = "pwm-servo";
@@ -36,42 +32,46 @@
             label = "Killswitch modeled as a button";
         };
     };
+
     thrusters {
         compatible = "pwm-leds";
         thruster0: thruster0 {
-            pwms = <&pwm 7 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
-        };
-        thruster1: thruster1 {
             pwms = <&pwm 6 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
         };
-        thruster2: thruster2 {
-            pwms = <&pwm 3 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        thruster1: thruster1 {
+            pwms = <&pwm 7 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
         };
-        thruster3: thruster3 {
+        thruster2: thruster2 {
             pwms = <&pwm 2 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
         };
+        thruster3: thruster3 {
+            pwms = <&pwm 3 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        };
         thruster4: thruster4 {
-            pwms = <&pwm 9 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
-        };
-        thruster5: thruster5 {
-            pwms = <&pwm 0 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
-        };
-        thruster6: thruster6 {
-            pwms = <&pwm 1 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
-        };
-        thruster7: thruster7 {
             pwms = <&pwm 8 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
         };
+        thruster5: thruster5 {
+            pwms = <&pwm 1 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        };
+        thruster6: thruster6 {
+            pwms = <&pwm 0 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        };
+        thruster7: thruster7 {
+            pwms = <&pwm 9 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+        };
     };
+
     chosen {
         zephyr,console = &cdc_acm_uart0;
     };
 };
+
 &zephyr_udc0 {
     cdc_acm_uart0: cdc_acm_uart0 {
         compatible = "zephyr,cdc-acm-uart";
     };
 };
+
 &pwm {
     status = "okay";
     divider-frac-0 = <15>;
@@ -91,13 +91,14 @@
     divider-frac-7 = <15>;
     divider-int-7 = <255>;
 };
+
 &adc {
     status = "okay";
     pinctrl-0 = <&adc_default>;
     pinctrl-names = "default";
     #address-cells = <1>;
     #size-cells = <0>;
-    /* physical pin 31 -> GP26 -> ADC channel 0 */
+
     pressure: channel@0 {
         reg = <0>;
         zephyr,gain = "ADC_GAIN_1";
@@ -106,32 +107,20 @@
         zephyr,resolution = <12>;
     };
 };
+
 &pinctrl {
-    uart1_default: uart1_default {
-        group1 {
-            pinmux = <UART1_TX_P8>;
-        };
-        group2 {
-            pinmux = <UART1_RX_P9>;
-            input-enable;
-        };
-    };
     adc_default: adc_default {
         group1 {
             pinmux = <ADC_CH0_P26>;
         };
     };
 };
+
 &pwm_ch4b_default {
     group1 {
-        /* all eight thruster pins GP0..GP7 must be muxed to PWM */
-        pinmux = <PWM_0A_P0 PWM_0B_P1 PWM_1A_P2 PWM_1B_P3
-                  PWM_2A_P4 PWM_2B_P5 PWM_3A_P6 PWM_3B_P7>;
+        pinmux = <PWM_0A_P0  PWM_0B_P1
+                  PWM_1A_P2  PWM_1B_P3
+                  PWM_3A_P6  PWM_3B_P7
+                  PWM_4A_P8 PWM_4B_P9>;
     };
-};
-&uart1 {
-    current-speed = <115200>;
-    status = "okay";
-    pinctrl-0 = <&uart1_default>;
-    pinctrl-names = "default";
 };

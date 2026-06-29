@@ -1,34 +1,48 @@
-#include <zephyr/kernel.h>
-
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-#include <stdint.h>
-
 #include "util.h"
-#include "strtok.h"
 
-const float DEG_TO_RAD = M_PI / 180.0f;
-const float RAD_TO_DEG = 180.0f / M_PI;
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
 
-uint32_t time_us() { return k_cyc_to_us_ceil32(k_cycle_get_32()); }
+bool parse_int_arg(char *token, int *value)
+{
+	char *end;
+	long parsed;
 
-int parse_int(char *delim, char **save_ptr) {
-    char *token = strtok_r(NULL, delim, save_ptr);
-    return atoi(token);
+	if (token == NULL || token[0] == '\0') {
+		return false;
+	}
+
+	errno = 0;
+	parsed = strtol(token, &end, 10);
+	if (errno != 0 || *end != '\0') {
+		return false;
+	}
+
+	*value = (int)parsed;
+	return true;
 }
 
-float parse_float(char *delim, char **save_ptr) {
-    char *token = strtok_r(NULL, delim, save_ptr);
-    return atof(token);
+bool parse_float_arg(char *token, float *value)
+{
+	char *end;
+	float parsed;
+
+	if (token == NULL || token[0] == '\0') {
+		return false;
+	}
+
+	errno = 0;
+	parsed = strtof(token, &end);
+	if (errno != 0 || *end != '\0') {
+		return false;
+	}
+
+	*value = parsed;
+	return true;
 }
 
-float rad_to_deg(float rad) {
-    return rad * RAD_TO_DEG;
+float clamp(float val, float low, float high)
+{
+	return (val < low) ? low : (val > high) ? high : val;
 }
-
-float deg_to_rad(float deg) {
-    return deg * DEG_TO_RAD;
-}
-
