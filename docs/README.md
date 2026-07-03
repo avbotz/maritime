@@ -147,38 +147,11 @@ The killswitch connects to a GPIO pin on the nucleo. When the sub is unkilled, t
 
 Refer to the General Starters section for a general look on interfacing the killswitch.
 
-# Control Loop
-
-Maritime's primary goal is to command the thrusters to move the sub to a coordinate destination (x, y, z, yaw, pitch, roll) that Boops-Boops wants it to move to. It uses a cascade PID controller, where a position controller's output feeds into a velocity controller. 
-
-This is how it does so:
-* Read all the sensors to get the current state of the sub. Multiplying DVL's velocity * dt gives us x and y, pressure sensor gives us z, and AHRS gives us yaw, pitch, roll.
-* Calculate the error between our current state and desired state on each of the 6 axes.
-* Convert that absolute error into relative error on each axis.
-* Feed the relative error on each axis into pid controllers, which edit those errors. The edited errors become the velocity (m/s) or angular velocity (rad/s) setpoints we want the sub to move at. Essentially, the farther you are from the target, the faster you wanna go.
-* Calculate the error between your current velocity and your desired velocity on each of the 6 axes. These errors are then fed into our velocity pid controllers, which edit those errors. The edited errors then become our force/torque setpoints, one for each of the 6 axes. Essentially, the farther away you are from your desired velocity, the more force you wanna apply. 
-* These force and torque setpoints are values from -1 to 1, where 1 = 100% thruster power. These values are then clamped to be in the range of [-power, power], where power is the proportion of the thruster's power we want to use. Eg. power = 0.6 means the max thruster power we'll use is 60%. Finally, we have a set of forces and torques we want to apply to the sub.
-* Map the forces and torques to how much thrust we should put on each thruster. There is some matrix math, but you can simplify it like so: For each thruster, loop over each axis. If there is error on this axis and the thruster can go in this direction, add thrust to this thruster.
-* Now, you have an array of length 8, with each value being the thrust output in the range [-power, power], one value per thruster. The index of each value in the array is the same as the ID of the esc that the command is sent to. Pass this array to the send_thrusts() function, which sends these thrust values to the escs via the CAN protocol. 
-
 ## Depth vs Altitude Control
 
 * The sub can either control depth using the pressure sensor, or altitude using the DVL. We default to controlling depth because it is more consistent and does not depend on the shape of the floor. 
 * To toggle altitude control: Send "b [desired altitude]" to enable altitude control. Send "b -1" to disable altitude control and go back to depth control.
 
-## PID Controllers
-
-We use PID controllers to edit the raw position/angle error to optimally control the sub. I recommend watching videos to understand this. 
-
-* The proportional gain multiplies the raw error
-* The integral gain multiplies the area under the error vs. time curve and adds it to the overall error. This builds up error over time and forces the sub to adjust, avoiding steady state error (where the sub is close to a setpoint but refuses to go all the way)
-* The derivative gain multiplies the current slope of the error vs. time curve and adds it to the overall error. If your error is decreasing, this is a negative slope, so you have less response and are less aggressive as you approach the setpoint, allowing for a smooth setpoint approach. On the flip side, if your error is increasing with a disturbance, this is a positive error slope, so this adds more error and more aggression to combat that change. 
-
-- Proportional gain  =  Kp
-- Integral term      =  Ti     (More Ti is less integral gain, Ki = 1/Ti)
-- Derivative term    =  Td     (Td = Kd)
-
 ## Communicating with maritime
 
 When a PC is connected via USB to the microcontroller, the PC can send and receive data to the microcontroller via the serial protocol. Instructions for this are in the main maritime readme.
-
