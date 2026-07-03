@@ -1,5 +1,5 @@
 // Need the following line to include strtok_r, as picolibc does not include it by default
-// Seems to build fine though, but I get editor warnings if not included
+// Seems to build fine though, though I get editor warnings if the following line is not included
 #define _POSIX_C_SOURCE 200809L
 
 #include "killswitch.h"
@@ -16,6 +16,10 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
+
+#ifdef CONFIG_BOARD_RPI_PICO
+#include <pico/bootrom.h>
+#endif
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
@@ -80,6 +84,7 @@ int main(void)
 	send_thrusts(init_thrusters);
 
 	char msg[MSG_SIZE];
+	bool is_alive = false;
 	int64_t prev_alive_time = k_uptime_get();
 
 	while (true) {
@@ -118,11 +123,16 @@ int main(void)
 				float thrusts[8] = {thrust, thrust, thrust, thrust, thrust, thrust, thrust, thrust};
 				send_thrusts(thrusts);
 			}
+			#ifdef CONFIG_BOARD_RPI_PICO
+			else if (c == 'r') {
+				reset_usb_boot(0, 0);
+			}
+			#endif
 		}
 
 		int64_t current_time = k_uptime_get();
-		if (current_time - prev_alive_time >= 100) {
-			bool is_alive = alive();
+		if (is_alive != alive() || current_time - prev_alive_time >= 200) {
+			is_alive = alive();
 
 			printk(is_alive ? "x 0\n" : "x 1\n");
 

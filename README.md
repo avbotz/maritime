@@ -46,11 +46,12 @@ Send from high-level to maritime:
 ```
 p <thruster_id> <thrust>  Set one thruster, where thrust is clamped to [-1, 1].
 a <thrust>                Set all 8 thrusters to the same clamped thrust.
+r                         Reboot the microcontroller into DFU mode (allowing code to be flashed via UF2).
 ```
 
 Send from maritime to high-level:
 ```
-x <killed>                Published at 10 Hz; 1 means killed, 0 means alive.
+x <killed>                Published at 5 Hz; 1 means killed, 0 means alive.
 d <depth>                 Published at 10 Hz; depth in meters.
 ```
 
