@@ -83,6 +83,10 @@ int main(void)
 
 	send_thrusts(init_thrusters);
 
+	// Provide initialize pulse to ESCs
+	// https://docs.bluerobotics.com/bluesc/#:~:text=Provide%20a%20%E2%80%9Cstopped%E2%80%9D%20signal%20at%201500%20%CE%BCs%20for%20a%20few%20seconds
+	k_sleep(K_SECONDS(3));
+	
 	char msg[MSG_SIZE];
 	bool is_alive = false;
 	int64_t prev_alive_time = k_uptime_get();
@@ -132,6 +136,11 @@ int main(void)
 
 		int64_t current_time = k_uptime_get();
 		if (is_alive != alive() || current_time - prev_alive_time >= 200) {
+			if (!is_alive && alive()) {
+				// Provide initialize pulse to ESCs
+				k_sleep(K_SECONDS(3));
+			}
+			
 			is_alive = alive();
 
 			printk(is_alive ? "x 0\n" : "x 1\n");
