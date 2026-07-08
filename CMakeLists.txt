@@ -8,4 +8,4 @@ target_include_directories(app PRIVATE include)
 # FILE(GLOB app_sources src/*.c)
 
 # target_sources(app PRIVATE ${app_sources})
-target_sources(app PRIVATE src/main.c src/killswitch.c src/thruster.c src/util.c)
+target_sources(app PRIVATE src/main.c src/killswitch.c src/thruster.c src/util.c src/pressure.c src/servo.c)

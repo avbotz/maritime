@@ -41,8 +41,3 @@ bool parse_float_arg(char *token, float *value)
 	*value = parsed;
 	return true;
 }
-
-float clamp(float val, float low, float high)
-{
-	return (val < low) ? low : (val > high) ? high : val;
-}
