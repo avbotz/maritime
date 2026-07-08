@@ -3,7 +3,9 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include "killswitch.h"
+#include "pressure.h"
 #include "thruster.h"
+#include "servo.h"
 #include "util.h"
 
 #include <zephyr/kernel.h>
@@ -77,7 +79,8 @@ int main(void)
 	uart_irq_rx_enable(usb_device);
 	setup_killswitch();
 	setup_thrusters();
-	// setup_servos();
+	setup_servos();
+	setup_pressure();
 
 	float init_thrusters[8] = {0.0f};
 
@@ -126,6 +129,47 @@ int main(void)
 
 				float thrusts[8] = {thrust, thrust, thrust, thrust, thrust, thrust, thrust, thrust};
 				send_thrusts(thrusts);
+			} else if (c == 's') {
+				// Usage: s <type> <pulse>
+				// type: g (grabber), t (shooter), d (dropper)
+				// pulse: microseconds (1000 = 1ms)
+				char *type_token = strtok_r(NULL, " ", &save_ptr);
+
+				if (!type_token) {
+					continue;
+				}
+
+				char type = type_token[0];
+
+				char *pulse_token = strtok_r(NULL, " ", &save_ptr);
+				int pulse;
+
+				if (!parse_int_arg(pulse_token, &pulse)) {
+					continue;
+				}
+
+				// convert to nanoseconds (1000 = 1ms)
+				if (type == 'g') {
+					set_pulse(SERVO_GRABBER, pulse * 1000);
+				} else if (type == 't') {
+					set_pulse(SERVO_SHOOTER, pulse * 1000);
+				} else if (type == 'd') {
+					set_pulse(SERVO_DROPPER, pulse * 1000);
+				}
+			} else if (c == 't') {
+				shoot(0, 0);
+				k_sleep(K_SECONDS(1));
+				shoot(0, 1);
+				k_sleep(K_SECONDS(1));
+				shoot(1, 1);
+				k_sleep(K_SECONDS(1));
+
+				drop(0, 0);
+				k_sleep(K_SECONDS(1));
+				drop(0, 1);
+				k_sleep(K_SECONDS(1));
+				drop(1, 1);
+				k_sleep(K_SECONDS(1));
 			}
 			#ifdef CONFIG_BOARD_RPI_PICO
 			else if (c == 'r') {
@@ -135,12 +179,13 @@ int main(void)
 		}
 
 		int64_t current_time = k_uptime_get();
-		if (is_alive != alive() || current_time - prev_alive_time >= 200) {
+		if (current_time - prev_alive_time >= 200) {
+			// Kill Switch
 			if (!is_alive && alive()) {
 				// Provide initialize pulse to ESCs
 				k_sleep(K_SECONDS(3));
 			}
-			
+
 			is_alive = alive();
 
 			printk(is_alive ? "x 0\n" : "x 1\n");
@@ -148,6 +193,14 @@ int main(void)
 			if (!is_alive) {
 				send_thrusts(init_thrusters);
 			}
+
+			// Pressure Sensor
+			float depth_m = get_depth_meters();
+			// the pico does not support floating point formatting in printk, so we need to convert to integer parts
+			int depth_m_int = (int)depth_m;
+			int depth_m_frac = (int)((depth_m - depth_m_int) * 1000); 
+
+			printk("d %d.%03d\n", depth_m_int, depth_m_frac);
 
 			prev_alive_time = current_time;
 		}

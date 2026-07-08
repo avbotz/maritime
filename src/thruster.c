@@ -4,9 +4,10 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/uart.h>
 #include <zephyr/drivers/can.h>
-#include <zephyr/sys/ring_buffer.h>
-#include <zephyr/logging/log.h>
 #include <zephyr/drivers/pwm.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/sys/ring_buffer.h>
+#include <zephyr/sys/util.h>
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -54,7 +55,7 @@ void send_thrust(int thruster, float thrust)
 		return;
 	}
 
-	thrust = clamp(thrust, -MAX_POWER, MAX_POWER);
+	thrust = CLAMP(thrust, -MAX_POWER, MAX_POWER);
 
 	uint32_t pulse_width =
 		(uint32_t)((thrust + 1.0f) * (THRUSTER_MAX_PULSE - THRUSTER_MIN_PULSE) / 2 +
