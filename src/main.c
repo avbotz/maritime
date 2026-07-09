@@ -36,8 +36,6 @@ K_MSGQ_DEFINE(uart_msgq, MSG_SIZE, 10, 1);
 static char rx_buf[MSG_SIZE];
 static size_t rx_pos = 0;
 
-
-
 static void uart_rx_handler(const struct device *dev, void *user_data)
 {
 	ARG_UNUSED(user_data);
@@ -89,7 +87,7 @@ int main(void)
 	// Provide initialize pulse to ESCs
 	// https://docs.bluerobotics.com/bluesc/#:~:text=Provide%20a%20%E2%80%9Cstopped%E2%80%9D%20signal%20at%201500%20%CE%BCs%20for%20a%20few%20seconds
 	k_sleep(K_SECONDS(3));
-	
+
 	char msg[MSG_SIZE];
 	bool is_alive = false;
 	int64_t prev_alive_time = k_uptime_get();
@@ -118,7 +116,8 @@ int main(void)
 
 				send_thrust(thruster, thrust);
 
-				LOG_DBG("Setting thruster power: p %d %d\n", thruster, (int)(thrust * 1000));
+				LOG_DBG("Setting thruster power: p %d %d\n", thruster,
+					(int)(thrust * 1000));
 			} else if (c == 'a') {
 				char *thrust_token = strtok_r(NULL, " ", &save_ptr);
 				float thrust;
@@ -127,7 +126,8 @@ int main(void)
 					continue;
 				}
 
-				float thrusts[8] = {thrust, thrust, thrust, thrust, thrust, thrust, thrust, thrust};
+				float thrusts[8] = {thrust, thrust, thrust, thrust,
+						    thrust, thrust, thrust, thrust};
 				send_thrusts(thrusts);
 			} else if (c == 's') {
 				// Usage: s <type> <pulse>
@@ -182,12 +182,12 @@ int main(void)
 				int state = state_token[0] == '1' ? 1 : 0;
 
 				drop(selector, state);
-			} 
-			#ifdef CONFIG_BOARD_RPI_PICO
+			}
+#ifdef CONFIG_BOARD_RPI_PICO
 			else if (c == 'r') {
 				reset_usb_boot(0, 0);
 			}
-			#endif
+#endif
 		}
 
 		int64_t current_time = k_uptime_get();
@@ -208,9 +208,10 @@ int main(void)
 
 			// Pressure Sensor
 			float depth_m = get_depth_meters();
-			// the pico does not support floating point formatting in printk, so we need to convert to integer parts
+			// the pico does not support floating point formatting in printk, so we need
+			// to convert to integer parts
 			int depth_m_int = (int)depth_m;
-			int depth_m_frac = (int)((depth_m - depth_m_int) * 1000); 
+			int depth_m_frac = (int)((depth_m - depth_m_int) * 1000);
 
 			printk("d %d.%03d\n", depth_m_int, depth_m_frac);
 
