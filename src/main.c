@@ -149,28 +149,40 @@ int main(void)
 				}
 
 				// convert to nanoseconds (1000 = 1ms)
+				pulse = pulse * 1000;
+
 				if (type == 'g') {
-					set_pulse(SERVO_GRABBER, pulse * 1000);
+					set_pulse(SERVO_GRABBER, pulse);
 				} else if (type == 't') {
-					set_pulse(SERVO_SHOOTER, pulse * 1000);
+					set_pulse(SERVO_SHOOTER, pulse);
 				} else if (type == 'd') {
-					set_pulse(SERVO_DROPPER, pulse * 1000);
+					set_pulse(SERVO_DROPPER, pulse);
 				}
 			} else if (c == 't') {
-				shoot(0, 0);
-				k_sleep(K_SECONDS(1));
-				shoot(0, 1);
-				k_sleep(K_SECONDS(1));
-				shoot(1, 1);
-				k_sleep(K_SECONDS(1));
+				char *selector_token = strtok_r(NULL, " ", &save_ptr);
+				char *state_token = strtok_r(NULL, " ", &save_ptr);
 
-				drop(0, 0);
-				k_sleep(K_SECONDS(1));
-				drop(0, 1);
-				k_sleep(K_SECONDS(1));
-				drop(1, 1);
-				k_sleep(K_SECONDS(1));
-			}
+				if (!selector_token || !state_token) {
+					continue;
+				}
+
+				int selector = selector_token[0] == '1' ? 1 : 0;
+				int state = state_token[0] == '1' ? 1 : 0;
+
+				shoot(selector, state);
+			} else if (c == 'd') {
+				char *selector_token = strtok_r(NULL, " ", &save_ptr);
+				char *state_token = strtok_r(NULL, " ", &save_ptr);
+
+				if (!selector_token || !state_token) {
+					continue;
+				}
+
+				int selector = selector_token[0] == '1' ? 1 : 0;
+				int state = state_token[0] == '1' ? 1 : 0;
+
+				drop(selector, state);
+			} 
 			#ifdef CONFIG_BOARD_RPI_PICO
 			else if (c == 'r') {
 				reset_usb_boot(0, 0);
