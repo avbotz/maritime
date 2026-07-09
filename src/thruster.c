@@ -59,7 +59,7 @@ void send_thrust(int thruster, float thrust)
 
 	uint32_t pulse_width =
 		(uint32_t)((thrust + 1.0f) * (THRUSTER_MAX_PULSE - THRUSTER_MIN_PULSE) / 2 +
-				   THRUSTER_MIN_PULSE);
+			   THRUSTER_MIN_PULSE);
 
 	int ret = pwm_set_pulse_dt(thruster_devices[thruster], PWM_USEC(pulse_width));
 	if (ret < 0) {
