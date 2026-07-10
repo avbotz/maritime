@@ -196,6 +196,8 @@ int main(void)
 			if (!is_alive && alive()) {
 				// Provide initialize pulse to ESCs
 				k_sleep(K_SECONDS(3));
+
+				reset_reference();
 			}
 
 			is_alive = alive();

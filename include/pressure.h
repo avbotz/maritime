@@ -4,6 +4,7 @@
 #include <zephyr/kernel.h>
 
 int setup_pressure(void);
+int reset_reference(void);
 int get_raw_pressure(void);
 float get_depth_meters(void);
 

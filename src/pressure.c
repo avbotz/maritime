@@ -33,7 +33,12 @@ int get_raw_averaged_pressure()
 {
 	int sum = 0;
 	for (int i = 0; i < 10; i++) {
-		sum += get_raw_pressure();
+		int raw = get_raw_pressure();
+		if (raw <= 0) {
+			i--;
+			continue;
+		}
+		sum += raw;
 	}
 	return sum / 10;
 }
@@ -67,9 +72,19 @@ int setup_pressure()
 	return 0;
 }
 
+int reset_reference()
+{
+	initial_sample = get_raw_averaged_pressure();
+	if (initial_sample < 0) {
+		return -1;
+	}
+	LOG_DBG("Surface pressure: %d", initial_sample);
+	return 0;
+}
+
 float raw_pressure_to_depth(int raw_pressure, int initial_sample)
 {
-	return (raw_pressure - initial_sample) / 78.37;
+	return (raw_pressure - initial_sample) / 313.48;
 }
 
 float get_depth_meters()
