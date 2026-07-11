@@ -93,8 +93,6 @@ void drop(int idx, int value)
 	if (value == 0) {
 		ret = pwm_set_pulse_dt(&dropper_servo, dropper_mid_pulse);
 	} else if (value == 1) {
-		// TODO: Have mech redesign dropper to allow balls to be dropped at different times
-
 		// Set servo to drop the 0th (right) ball
 		if (idx == 0) {
 			ret = pwm_set_pulse_dt(&dropper_servo, dropper_max_pulse);
