@@ -1,16 +1,24 @@
 #ifndef _MARITIME_AHRS_H
 #define _MARITIME_AHRS_H
 
-int setup_ahrs(void);
-
-/* Orientation quaternion, q = {w, x, y, z} */
-void get_quaternion(float q[4]);
+#include <zephyr/kernel.h>
 
 /*
- * Euler angles in degrees (roll about x, pitch about y, yaw about z).
- * 6-DOF fusion (no magnetometer), so yaw is relative to startup heading
- * and slowly drifts with gyro bias.
+ * AHRS sample published to ahrs_data_msgq every 20 msec: NED Euler angles in
+ * radians (from the WT901's onboard fusion) and their finite-difference
+ * angular velocities in rad/s.
  */
-void get_rpy(float *roll, float *pitch, float *yaw);
+struct ahrs_data_s {
+	float yaw;
+	float pitch;
+	float roll;
+	float ang_vel_yaw;
+	float ang_vel_pitch;
+	float ang_vel_roll;
+};
+
+extern struct k_msgq ahrs_data_msgq;
+
+int setup_ahrs(void);
 
 #endif /* _MARITIME_AHRS_H */

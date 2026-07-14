@@ -103,6 +103,9 @@ int main(void)
 	char msg[MSG_SIZE];
 	bool is_alive = false;
 	int64_t prev_alive_time = k_uptime_get();
+	// Latest AHRS sample; holds the previous value when no new message has
+	// been published since the last read
+	struct ahrs_data_s ahrs_data = {0};
 
 	while (true) {
 		LOG_DBG("Recieved command: %s", msg);
@@ -238,19 +241,23 @@ int main(void)
 
 			printk("q %d\n", depth_raw);
 
-			// AHRS roll/pitch/yaw in degrees
-			float roll, pitch, yaw;
-			get_rpy(&roll, &pitch, &yaw);
+			// AHRS publishes NED angles in radians; convert to degrees
+			// for the serial protocol
+			k_msgq_get(&ahrs_data_msgq, &ahrs_data, K_NO_WAIT);
 
 			char roll_s[16], pitch_s[16], yaw_s[16];
-			format_float(roll, roll_s, sizeof(roll_s));
-			format_float(pitch, pitch_s, sizeof(pitch_s));
-			format_float(yaw, yaw_s, sizeof(yaw_s));
+			format_float((float)rad_to_deg(ahrs_data.roll), roll_s, sizeof(roll_s));
+			format_float((float)rad_to_deg(ahrs_data.pitch), pitch_s, sizeof(pitch_s));
+			format_float((float)rad_to_deg(ahrs_data.yaw), yaw_s, sizeof(yaw_s));
 
 			printk("i %s %s %s\n", roll_s, pitch_s, yaw_s);
 
 			prev_alive_time = current_time;
 		}
+
+		// Yield so lower-priority threads (AHRS frame processing, log
+		// thread) get CPU time; without this the busy loop starves them
+		k_sleep(K_MSEC(1));
 	}
 
 	return 0;

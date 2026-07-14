@@ -117,7 +117,7 @@
 /* WT901 IMU, factory default is 9600 baud 8N1 */
 &uart1 {
     status = "okay";
-    current-speed = <9600>;
+    current-speed = <115200>;
     pinctrl-0 = <&uart1_default>;
     pinctrl-names = "default";
 };

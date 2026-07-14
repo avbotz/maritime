@@ -1,263 +1,170 @@
-#include <zephyr/device.h>
-#include <zephyr/devicetree.h>
-#include <zephyr/drivers/uart.h>
-#include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
-#include <zephyr/sys/ring_buffer.h>
+#include <string.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
 
-#include <math.h>
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/sys/ring_buffer.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/timing/timing.h>
 
 #include "ahrs.h"
+#include "util.h"
 
-LOG_MODULE_REGISTER(ahrs, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(uart_ahrs, LOG_LEVEL_INF);
 
-/*
- * WT901 (WitMotion) standard UART protocol: 11-byte frames of
- * 0x55, <type>, 8 data bytes (little-endian int16), checksum (low byte of the
- * sum of the first 10 bytes). We only use the 6-DOF frames (accel + gyro) and
- * run our own fusion, so the magnetometer (0x54) and onboard angle (0x53)
- * frames are ignored.
- */
-#define WIT_FRAME_SIZE 11
-#define WIT_HEADER     0x55
-#define WIT_TYPE_ACCEL 0x51
-#define WIT_TYPE_GYRO  0x52
+#define UART2_DEVICE_NODE DT_NODELABEL(usart6)
 
-/* Raw int16 full scale maps to +/-16 g and +/-2000 deg/s (WT901 manual) */
-#define WIT_ACCEL_SCALE (16.0f / 32768.0f)
-#define WIT_GYRO_SCALE  (2000.0f / 32768.0f)
+static const struct device *uart_device = DEVICE_DT_GET(DT_NODELABEL(uart1));
 
-#define DEG_TO_RAD (3.14159265f / 180.0f)
-#define RAD_TO_DEG (180.0f / 3.14159265f)
+K_MSGQ_DEFINE(ahrs_data_msgq, sizeof(struct ahrs_data_s), 1, 4);
 
-/*
- * Mahony filter gains. KP sets how aggressively roll/pitch are pulled toward
- * the accelerometer's gravity vector, KI compensates slow gyro bias.
- */
-#define MAHONY_KP 1.0f
-#define MAHONY_KI 0.05f
+// Total bytes the message can store
+#define MSG_SZ 512
 
-static const struct device *wit_uart = DEVICE_DT_GET(DT_NODELABEL(uart1));
+#define NS_ELAPSED(time_a, time_b) (timing_cycles_to_ns(timing_cycles_get(&time_a, &time_b)))
 
-RING_BUF_DECLARE(wit_rx_ring, 256);
-static K_SEM_DEFINE(wit_rx_sem, 0, 1);
+RING_BUF_DECLARE(ring_buf_tx, MSG_SZ);
+RING_BUF_DECLARE(ring_buf_rx, MSG_SZ);
 
-static K_MUTEX_DEFINE(quat_lock);
-/* Orientation quaternion {w, x, y, z}, protected by quat_lock */
-static float q0 = 1.0f, q1, q2, q3;
+unsigned char ucRxBuffer[250];
+unsigned char ucRxCnt = 0;
 
-/* Latest accel sample in g, only touched by the AHRS thread */
-static float accel[3];
-static bool have_accel;
-
-/* Mahony integral feedback, only touched by the AHRS thread */
-static float integral_fb[3];
-
-static void wit_rx_handler(const struct device *dev, void *user_data)
+struct SAngle
 {
-	ARG_UNUSED(user_data);
+    short Angle[3];
+    short T;
+} stcAngle;
 
-	uint8_t buf[32];
+struct ahrs_data_s prev_sample = {
+    .yaw   = 0,
+    .pitch = 0,
+    .roll  = 0
+};
 
-	uart_irq_update(dev);
-	while (uart_irq_is_pending(dev)) {
-		if (uart_irq_rx_ready(dev)) {
-			int len = uart_fifo_read(dev, buf, sizeof(buf));
-			if (len > 0) {
-				ring_buf_put(&wit_rx_ring, buf, len);
-				k_sem_give(&wit_rx_sem);
-			}
-		}
-		uart_irq_update(dev);
-	}
+void process_frame() {
+
+    int ahrs_time = time_us();
+    int dt_us;
+    struct ahrs_data_s ahrs_data;
+
+    while (true) {
+        ahrs_data.yaw = (float) deg_to_rad(stcAngle.Angle[2] / 32768. * 180);
+        ahrs_data.pitch = (float) deg_to_rad(stcAngle.Angle[1] / 32768. * 180);
+        ahrs_data.roll = (float) deg_to_rad(stcAngle.Angle[0] / 32768. * 180);
+
+        dt_us = time_us() - ahrs_time;
+
+        ahrs_data.ang_vel_yaw = (ahrs_data.yaw - prev_sample.yaw) / dt_us * 1e6f;
+        ahrs_data.ang_vel_pitch = (ahrs_data.pitch - prev_sample.pitch) / dt_us * 1e6f;
+        ahrs_data.ang_vel_roll = (ahrs_data.roll - prev_sample.roll) / dt_us * 1e6f;
+
+        while (k_msgq_put(&ahrs_data_msgq, &ahrs_data, K_NO_WAIT) != 0) {
+            k_msgq_put(&ahrs_data_msgq, &ahrs_data, K_NO_WAIT);
+        }
+
+        // LOG_DBG("Timestamp: %u", tt);
+        prev_sample = ahrs_data;
+        ahrs_time = time_us();
+
+        // LOG_DBG("%f %f %f", ahrs_data.ang_vel_yaw, ahrs_data.ang_vel_pitch, ahrs_data.ang_vel_roll); 
+        LOG_DBG("Dt: %u\n\rYaw: %f, Pitch: %f, Roll: %f",
+                dt_us,
+                ahrs_data.yaw,
+                ahrs_data.pitch,
+                ahrs_data.roll);
+
+        // Publish new data every 20 msec
+        k_sleep(K_MSEC(20));
+    }
 }
 
-static void mahony_update(float gx, float gy, float gz, float ax, float ay, float az, float dt)
-{
-	float norm = sqrtf(ax * ax + ay * ay + az * az);
-
-	/*
-	 * Only trust the accelerometer when it is measuring roughly 1 g;
-	 * during hard thruster accelerations it is not a gravity reference.
-	 */
-	if (norm > 0.5f && norm < 1.5f) {
-		ax /= norm;
-		ay /= norm;
-		az /= norm;
-
-		/* Gravity direction estimated from the current quaternion */
-		float vx = 2.0f * (q1 * q3 - q0 * q2);
-		float vy = 2.0f * (q0 * q1 + q2 * q3);
-		float vz = q0 * q0 - q1 * q1 - q2 * q2 + q3 * q3;
-
-		/* Error is the cross product of measured and estimated gravity */
-		float ex = ay * vz - az * vy;
-		float ey = az * vx - ax * vz;
-		float ez = ax * vy - ay * vx;
-
-		integral_fb[0] += MAHONY_KI * ex * dt;
-		integral_fb[1] += MAHONY_KI * ey * dt;
-		integral_fb[2] += MAHONY_KI * ez * dt;
-
-		gx += MAHONY_KP * ex + integral_fb[0];
-		gy += MAHONY_KP * ey + integral_fb[1];
-		gz += MAHONY_KP * ez + integral_fb[2];
-	}
-
-	/* Integrate quaternion rate: q_dot = 0.5 * q * (0, gx, gy, gz) */
-	float half_dt = 0.5f * dt;
-	float dq0 = (-q1 * gx - q2 * gy - q3 * gz) * half_dt;
-	float dq1 = (q0 * gx + q2 * gz - q3 * gy) * half_dt;
-	float dq2 = (q0 * gy - q1 * gz + q3 * gx) * half_dt;
-	float dq3 = (q0 * gz + q1 * gy - q2 * gx) * half_dt;
-
-	float nq0 = q0 + dq0;
-	float nq1 = q1 + dq1;
-	float nq2 = q2 + dq2;
-	float nq3 = q3 + dq3;
-
-	norm = sqrtf(nq0 * nq0 + nq1 * nq1 + nq2 * nq2 + nq3 * nq3);
-	if (norm == 0.0f) {
-		return;
-	}
-
-	k_mutex_lock(&quat_lock, K_FOREVER);
-	q0 = nq0 / norm;
-	q1 = nq1 / norm;
-	q2 = nq2 / norm;
-	q3 = nq3 / norm;
-	k_mutex_unlock(&quat_lock);
+void uart_tx_msg(char *msg){
+    LOG_DBG("Sending AHRS MSG: %s", msg);
+    ring_buf_put(&ring_buf_tx, msg, strlen(msg));
+    uart_irq_tx_enable(uart_device);
 }
 
-static void handle_frame(const uint8_t *frame)
-{
-	static uint32_t last_cycles;
-	static bool have_last_cycles;
 
-	int16_t x = (int16_t)((frame[3] << 8) | frame[2]);
-	int16_t y = (int16_t)((frame[5] << 8) | frame[4]);
-	int16_t z = (int16_t)((frame[7] << 8) | frame[6]);
+static void uart_irq_callback(const struct device *dev, void *data) {
+    ARG_UNUSED(dev);
+    ARG_UNUSED(data);
 
-	if (frame[1] == WIT_TYPE_ACCEL) {
-		accel[0] = x * WIT_ACCEL_SCALE;
-		accel[1] = y * WIT_ACCEL_SCALE;
-		accel[2] = z * WIT_ACCEL_SCALE;
-		have_accel = true;
-	} else if (frame[1] == WIT_TYPE_GYRO) {
-		uint32_t now = k_cycle_get_32();
-		float dt = k_cyc_to_us_floor32(now - last_cycles) * 1e-6f;
+    // uint8_t rx[3] = "000";
+    // uint8_t pos = -1;
+    uart_irq_update(uart_device);
+    while (uart_irq_is_pending(uart_device)) {
 
-		bool dt_valid = have_last_cycles && dt > 0.0f && dt < 0.5f;
+        if (uart_irq_tx_complete(uart_device) && ring_buf_is_empty(&ring_buf_tx)){
+            uart_irq_tx_disable(uart_device);
+        }
 
-		last_cycles = now;
-		have_last_cycles = true;
+        uint8_t tx_byte;
+        if (uart_irq_tx_ready(uart_device)){
+            ring_buf_get(&ring_buf_tx, &tx_byte, 1);
+            uart_fifo_fill(uart_device, &tx_byte, 1);
+        }
 
-		if (!have_accel || !dt_valid) {
-			return;
-		}
+        uint8_t rx_byte;
+        if (uart_irq_rx_ready(uart_device)) {
+            // printk("%c", rx_byte);
+            uart_fifo_read(uart_device, &rx_byte, 1);
 
-		mahony_update(x * WIT_GYRO_SCALE * DEG_TO_RAD, y * WIT_GYRO_SCALE * DEG_TO_RAD,
-			      z * WIT_GYRO_SCALE * DEG_TO_RAD, accel[0], accel[1], accel[2], dt);
-	}
+            // Discard characters until the start of the packet
+            ucRxBuffer[ucRxCnt++] = rx_byte;
+            if (ucRxBuffer[0] != 0x55) 
+            {
+                ucRxCnt = 0;
+                return;
+            }
+
+            // Wait until we have built all 11 bytes of the packet?
+            if (ucRxCnt<11) 
+            {
+                return;
+            }
+            else
+            {
+                // Store the angular data
+                switch(ucRxBuffer[1])
+                {
+                    // case 0x50:  memcpy(&stcTime,&ucRxBuffer[2],8);break;
+                    // case 0x51:  memcpy(&stcAcc,&ucRxBuffer[2],8);break;
+                    // case 0x52:  memcpy(&stcGyro,&ucRxBuffer[2],8);break;
+                    case 0x53:  memcpy(&stcAngle,&ucRxBuffer[2],8);break;
+                    // case 0x54:  memcpy(&stcMag,&ucRxBuffer[2],8);break;
+                    // case 0x55:  memcpy(&stcDStatus,&ucRxBuffer[2],8);break;
+                    // case 0x56:  memcpy(&stcPress,&ucRxBuffer[2],8);break;
+                    // case 0x57:  memcpy(&stcLonLat,&ucRxBuffer[2],8);break;
+                    // case 0x58:  memcpy(&stcGPSV,&ucRxBuffer[2],8);break;
+                    // case 0x59:  memcpy(&stcQuater,&ucRxBuffer[2],8);break;
+                    // case 0x5a:  memcpy(&stcSN,&ucRxBuffer[2],8);break;
+                }
+                ucRxCnt=0;
+            }
+        }
+
+        uart_irq_update(uart_device);
+    }
+
 }
 
-static void ahrs_thread(void *p1, void *p2, void *p3)
-{
-	ARG_UNUSED(p1);
-	ARG_UNUSED(p2);
-	ARG_UNUSED(p3);
+int setup_ahrs() {
+    LOG_DBG("Setting up AHRS");
+    if (!device_is_ready(uart_device)) {
+        return -1;
+    }
 
-	uint8_t frame[WIT_FRAME_SIZE];
-	size_t pos = 0;
+    uart_irq_callback_user_data_set(uart_device, uart_irq_callback, NULL);
+    uart_irq_rx_enable(uart_device);
 
-	while (true) {
-		uint8_t byte;
+    LOG_DBG("Finished setting up AHRS");
 
-		if (ring_buf_get(&wit_rx_ring, &byte, 1) != 1) {
-			k_sem_take(&wit_rx_sem, K_FOREVER);
-			continue;
-		}
-
-		if (pos == 0 && byte != WIT_HEADER) {
-			continue;
-		}
-
-		/* All WitMotion frame types are 0x5x; anything else means we
-		 * synced on a data byte, so restart the search */
-		if (pos == 1 && (byte & 0xF0) != 0x50) {
-			pos = byte == WIT_HEADER ? 1 : 0;
-			continue;
-		}
-
-		frame[pos++] = byte;
-		if (pos < WIT_FRAME_SIZE) {
-			continue;
-		}
-		pos = 0;
-
-		uint8_t sum = 0;
-		for (int i = 0; i < WIT_FRAME_SIZE - 1; i++) {
-			sum += frame[i];
-		}
-
-		if (sum != frame[WIT_FRAME_SIZE - 1]) {
-			LOG_WRN("Bad checksum on frame type 0x%02x", frame[1]);
-			continue;
-		}
-
-		handle_frame(frame);
-	}
+    return 0; 
 }
 
-K_THREAD_DEFINE(ahrs, 2048, ahrs_thread, NULL, NULL, NULL, 7, 0, 0);
-
-void get_quaternion(float q[4])
-{
-	k_mutex_lock(&quat_lock, K_FOREVER);
-	q[0] = q0;
-	q[1] = q1;
-	q[2] = q2;
-	q[3] = q3;
-	k_mutex_unlock(&quat_lock);
-}
-
-void get_rpy(float *roll, float *pitch, float *yaw)
-{
-	float q[4];
-
-	get_quaternion(q);
-
-	float sin_pitch = 2.0f * (q[0] * q[2] - q[3] * q[1]);
-
-	if (sin_pitch > 1.0f) {
-		sin_pitch = 1.0f;
-	} else if (sin_pitch < -1.0f) {
-		sin_pitch = -1.0f;
-	}
-
-	*roll = atan2f(2.0f * (q[0] * q[1] + q[2] * q[3]),
-		       1.0f - 2.0f * (q[1] * q[1] + q[2] * q[2])) *
-		RAD_TO_DEG;
-	*pitch = asinf(sin_pitch) * RAD_TO_DEG;
-	*yaw = atan2f(2.0f * (q[0] * q[3] + q[1] * q[2]),
-		      1.0f - 2.0f * (q[2] * q[2] + q[3] * q[3])) *
-	       RAD_TO_DEG;
-}
-
-int setup_ahrs(void)
-{
-	if (!device_is_ready(wit_uart)) {
-		LOG_ERR("WT901 UART %s not ready", wit_uart->name);
-		return -ENODEV;
-	}
-
-	int ret = uart_irq_callback_user_data_set(wit_uart, wit_rx_handler, NULL);
-	if (ret != 0) {
-		LOG_ERR("Failed to set WT901 UART callback: %d", ret);
-		return ret;
-	}
-
-	uart_irq_rx_enable(wit_uart);
-
-	return 0;
-}
+K_THREAD_DEFINE(ahrs_rx_frame_handle_thread_id, 4096,
+                process_frame, NULL, NULL, NULL,
+                K_LOWEST_APPLICATION_THREAD_PRIO, 0, 0);

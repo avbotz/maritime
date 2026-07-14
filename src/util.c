@@ -4,6 +4,25 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <zephyr/kernel.h>
+
+#define PI 3.14159265358979323846
+
+int64_t time_us(void)
+{
+	return k_ticks_to_us_floor64(k_uptime_ticks());
+}
+
+double deg_to_rad(double deg)
+{
+	return deg * (PI / 180.0);
+}
+
+double rad_to_deg(double rad)
+{
+	return rad * (180.0 / PI);
+}
+
 bool parse_int_arg(char *token, int *value)
 {
 	char *end;
