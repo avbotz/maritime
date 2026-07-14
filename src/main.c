@@ -250,9 +250,9 @@ int main(void)
 			k_msgq_get(&ahrs_data_msgq, &ahrs_data, K_NO_WAIT);
 
 			char roll_s[16], pitch_s[16], yaw_s[16];
-			format_float((float)rad_to_deg(ahrs_data.roll), roll_s, sizeof(roll_s));
-			format_float((float)rad_to_deg(ahrs_data.pitch), pitch_s, sizeof(pitch_s));
-			format_float((float)rad_to_deg(ahrs_data.yaw), yaw_s, sizeof(yaw_s));
+			format_float((float)ahrs_data.roll, roll_s, sizeof(roll_s));
+			format_float((float)ahrs_data.pitch, pitch_s, sizeof(pitch_s));
+			format_float((float)ahrs_data.yaw, yaw_s, sizeof(yaw_s));
 
 			printk("i %s %s %s\n", roll_s, pitch_s, yaw_s);
 
