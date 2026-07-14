@@ -84,7 +84,7 @@ int reset_reference()
 
 float raw_pressure_to_depth(int raw_pressure, int initial_sample)
 {
-	return (raw_pressure - initial_sample) / 461.189;
+	return (raw_pressure - initial_sample) / 365.0;
 }
 
 float get_depth_meters()

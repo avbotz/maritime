@@ -2,6 +2,7 @@
 // Seems to build fine though, though I get editor warnings if the following line is not included
 #define _POSIX_C_SOURCE 200809L
 
+#include "ahrs.h"
 #include "killswitch.h"
 #include "pressure.h"
 #include "thruster.h"
@@ -35,6 +36,16 @@ K_MSGQ_DEFINE(uart_msgq, MSG_SIZE, 10, 1);
 
 static char rx_buf[MSG_SIZE];
 static size_t rx_pos = 0;
+
+// the pico does not support floating point formatting in printk, so we need to
+// convert to integer parts
+static void format_float(float value, char *buf, size_t size)
+{
+	int whole = abs((int)value);
+	int frac = abs((int)((value - (int)value) * 1000));
+
+	snprintf(buf, size, "%s%d.%03d", value < 0 ? "-" : "", whole, frac);
+}
 
 static void uart_rx_handler(const struct device *dev, void *user_data)
 {
@@ -79,6 +90,7 @@ int main(void)
 	setup_thrusters();
 	setup_servos();
 	setup_pressure();
+	setup_ahrs();
 
 	float init_thrusters[8] = {0.0f};
 
@@ -212,10 +224,30 @@ int main(void)
 			float depth_m = get_depth_meters();
 			// the pico does not support floating point formatting in printk, so we need
 			// to convert to integer parts
-			int depth_m_int = (int)depth_m;
-			int depth_m_frac = (int)((depth_m - depth_m_int) * 1000);
+			int depth_m_int = abs((int)depth_m);
+			int depth_m_frac = abs((int)((depth_m - depth_m_int) * 1000));
 
-			printk("d %d.%03d\n", depth_m_int, depth_m_frac);
+
+			if (depth_m >= 0) {
+				printk("d %d.%03d\n", depth_m_int, depth_m_frac);
+			} else {
+				printk("d -%d.%03d\n", depth_m_int, depth_m_frac);
+			}
+
+			int depth_raw = get_raw_pressure();
+
+			printk("q %d\n", depth_raw);
+
+			// AHRS roll/pitch/yaw in degrees
+			float roll, pitch, yaw;
+			get_rpy(&roll, &pitch, &yaw);
+
+			char roll_s[16], pitch_s[16], yaw_s[16];
+			format_float(roll, roll_s, sizeof(roll_s));
+			format_float(pitch, pitch_s, sizeof(pitch_s));
+			format_float(yaw, yaw_s, sizeof(yaw_s));
+
+			printk("i %s %s %s\n", roll_s, pitch_s, yaw_s);
 
 			prev_alive_time = current_time;
 		}
