@@ -102,7 +102,8 @@ int main(void)
 
 	char msg[MSG_SIZE];
 	bool is_alive = false;
-	int64_t prev_alive_time = k_uptime_get();
+	int64_t kill_prev_data_time = k_uptime_get();
+	int64_t imu_prev_data_time = k_uptime_get();
 	// Latest AHRS sample; holds the previous value when no new message has
 	// been published since the last read
 	struct ahrs_data_s ahrs_data = {0};
@@ -206,7 +207,7 @@ int main(void)
 		}
 
 		int64_t current_time = k_uptime_get();
-		if (current_time - prev_alive_time >= 200) {
+		if (current_time - kill_prev_data_time >= 200) {
 			// Kill Switch
 			if (!is_alive && alive()) {
 				// Provide initialize pulse to ESCs
@@ -230,7 +231,6 @@ int main(void)
 			int depth_m_int = abs((int)depth_m);
 			int depth_m_frac = abs((int)((depth_m - depth_m_int) * 1000));
 
-
 			if (depth_m >= 0) {
 				printk("d %d.%03d\n", depth_m_int, depth_m_frac);
 			} else {
@@ -241,6 +241,10 @@ int main(void)
 
 			printk("q %d\n", depth_raw);
 
+			kill_prev_data_time = current_time;
+		}
+
+		if (current_time - imu_prev_data_time >= 25) {
 			// AHRS publishes NED angles in radians; convert to degrees
 			// for the serial protocol
 			k_msgq_get(&ahrs_data_msgq, &ahrs_data, K_NO_WAIT);
@@ -252,7 +256,7 @@ int main(void)
 
 			printk("i %s %s %s\n", roll_s, pitch_s, yaw_s);
 
-			prev_alive_time = current_time;
+			imu_prev_data_time = current_time;
 		}
 
 		// Yield so lower-priority threads (AHRS frame processing, log
