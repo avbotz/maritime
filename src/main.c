@@ -98,12 +98,12 @@ int main(void)
 
 	// Provide initialize pulse to ESCs
 	// https://docs.bluerobotics.com/bluesc/#:~:text=Provide%20a%20%E2%80%9Cstopped%E2%80%9D%20signal%20at%201500%20%CE%BCs%20for%20a%20few%20seconds
-	k_sleep(K_SECONDS(3));
+	k_sleep(K_SECONDS(2));
 
 	char msg[MSG_SIZE];
-	bool is_alive = false;
-	int64_t kill_prev_data_time = k_uptime_get();
-	int64_t imu_prev_data_time = k_uptime_get();
+	bool prev_is_alive = false;
+	int64_t prev_data_time = k_uptime_get();
+	int64_t prev_imu_data_time = k_uptime_get();
 	// Latest AHRS sample; holds the previous value when no new message has
 	// been published since the last read
 	struct ahrs_data_s ahrs_data = {0};
@@ -207,22 +207,39 @@ int main(void)
 		}
 
 		int64_t current_time = k_uptime_get();
-		if (current_time - kill_prev_data_time >= 200) {
+		if (current_time - prev_data_time >= 200) {
 			// Kill Switch
-			if (!is_alive && alive()) {
+			bool is_alive = alive();
+
+			// Software debounce based on moving average
+			if (is_alive != prev_is_alive) {
+				int alive_state = 0;
+				int killed_state = 0;
+
+				for (int i = 0; i < 5; i++) {
+					is_alive = alive();
+					alive_state = is_alive ? alive_state + 1 : alive_state;
+					killed_state = !is_alive ? killed_state + 1 : killed_state;
+					k_sleep(K_MSEC(15));
+				}
+
+				is_alive = alive_state >= 5;
+			}
+			
+			if (!prev_is_alive && is_alive) {
 				// Provide initialize pulse to ESCs
-				k_sleep(K_SECONDS(3));
+				k_sleep(K_SECONDS(2));
 
 				reset_reference();
 			}
-
-			is_alive = alive();
 
 			printk(is_alive ? "x 0\n" : "x 1\n");
 
 			if (!is_alive) {
 				send_thrusts(init_thrusters);
 			}
+
+			prev_is_alive = is_alive;
 
 			// Pressure Sensor
 			float depth_m = get_depth_meters();
@@ -239,12 +256,12 @@ int main(void)
 
 			int depth_raw = get_raw_pressure();
 
-			printk("q %d\n", depth_raw);
+			LOG_DBG("q %d\n", depth_raw);
 
-			kill_prev_data_time = current_time;
+			prev_data_time = current_time;
 		}
 
-		if (current_time - imu_prev_data_time >= 25) {
+		if (current_time - prev_imu_data_time >= 25) {
 			// AHRS publishes NED angles in radians; convert to degrees
 			// for the serial protocol
 			k_msgq_get(&ahrs_data_msgq, &ahrs_data, K_NO_WAIT);
@@ -256,7 +273,7 @@ int main(void)
 
 			printk("i %s %s %s\n", roll_s, pitch_s, yaw_s);
 
-			imu_prev_data_time = current_time;
+			prev_imu_data_time = current_time;
 		}
 
 		// Yield so lower-priority threads (AHRS frame processing, log
