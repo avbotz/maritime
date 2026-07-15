@@ -211,6 +211,8 @@ int main(void)
 			// Kill Switch
 			bool is_alive = !alive();
 
+			LOG_DBG("raw alive: %d", is_alive);
+
 			// Software debounce based on moving average
 			if (is_alive != prev_is_alive) {
 				int alive_state = 0;
