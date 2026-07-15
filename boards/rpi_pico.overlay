@@ -24,8 +24,9 @@
     shooter_servo: shooter_servo {
         compatible = "pwm-servo";
         pwms = <&pwm 4 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
-        min-pulse = <PWM_USEC(1250)>;
-        max-pulse = <PWM_USEC(1750)>;
+        min-pulse = <PWM_USEC(800)>;
+        mid-pulse = <PWM_USEC(1150)>;
+        max-pulse = <PWM_USEC(1700)>;
     };
 
     buttons {

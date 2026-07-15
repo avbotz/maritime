@@ -23,8 +23,8 @@ static const uint32_t dropper_mid_pulse = (dropper_min_pulse + dropper_max_pulse
 // static const uint32_t grabber_max_pulse = DT_PROP(DT_NODELABEL(grabber_servo), max_pulse);
 
 static const uint32_t shooter_min_pulse = DT_PROP(DT_NODELABEL(shooter_servo), min_pulse);
+static const uint32_t shooter_mid_pulse = DT_PROP(DT_NODELABEL(shooter_servo), mid_pulse);
 static const uint32_t shooter_max_pulse = DT_PROP(DT_NODELABEL(shooter_servo), max_pulse);
-static const uint32_t shooter_mid_pulse = (shooter_min_pulse + shooter_max_pulse) / 2;
 
 /*
  * min pulse = min angle = left hole
@@ -91,15 +91,15 @@ void drop(int idx, int value)
 
 	// If requested, set servo to neutral position
 	if (value == 0) {
-		ret = pwm_set_pulse_dt(&dropper_servo, dropper_mid_pulse);
+		ret = pwm_set_pulse_dt(&dropper_servo, dropper_min_pulse);
 	} else if (value == 1) {
 		// Set servo to drop the 0th (right) ball
 		if (idx == 0) {
-			ret = pwm_set_pulse_dt(&dropper_servo, dropper_max_pulse);
+			ret = pwm_set_pulse_dt(&dropper_servo, dropper_mid_pulse);
 		}
 		// Set servo to drop the 1st (left) ball
 		else if (idx == 1) {
-			ret = pwm_set_pulse_dt(&dropper_servo, dropper_min_pulse);
+			ret = pwm_set_pulse_dt(&dropper_servo, dropper_max_pulse);
 		}
 	}
 

@@ -209,7 +209,7 @@ int main(void)
 		int64_t current_time = k_uptime_get();
 		if (current_time - prev_data_time >= 200) {
 			// Kill Switch
-			bool is_alive = alive();
+			bool is_alive = !alive();
 
 			// Software debounce based on moving average
 			if (is_alive != prev_is_alive) {
@@ -223,9 +223,9 @@ int main(void)
 					k_sleep(K_MSEC(15));
 				}
 
-				is_alive = alive_state >= 5;
+				is_alive = alive_state <= 5;
 			}
-			
+
 			if (!prev_is_alive && is_alive) {
 				// Provide initialize pulse to ESCs
 				k_sleep(K_SECONDS(2));

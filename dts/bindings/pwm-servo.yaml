@@ -18,6 +18,11 @@ properties:
     type: int
     description: Minimum pulse width (nanoseconds).
 
+  mid-pulse:
+    required: false
+    type: int
+    description: Middle pulse width (nanoseconds).
+
   max-pulse:
     required: true
     type: int
