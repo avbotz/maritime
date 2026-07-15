@@ -91,15 +91,15 @@ void drop(int idx, int value)
 
 	// If requested, set servo to neutral position
 	if (value == 0) {
-		ret = pwm_set_pulse_dt(&dropper_servo, dropper_min_pulse);
+		ret = pwm_set_pulse_dt(&dropper_servo, dropper_mid_pulse);
 	} else if (value == 1) {
 		// Set servo to drop the 0th (right) ball
 		if (idx == 0) {
-			ret = pwm_set_pulse_dt(&dropper_servo, dropper_mid_pulse);
+			ret = pwm_set_pulse_dt(&dropper_servo, dropper_max_pulse);
 		}
 		// Set servo to drop the 1st (left) ball
 		else if (idx == 1) {
-			ret = pwm_set_pulse_dt(&dropper_servo, dropper_max_pulse);
+			ret = pwm_set_pulse_dt(&dropper_servo, dropper_min_pulse);
 		}
 	}
 
@@ -131,15 +131,15 @@ void shoot(int idx, int value)
 	int ret = 0;
 	// If requested, set servo to neutral position (closes both holes)
 	if (value == 0) {
-		ret = pwm_set_pulse_dt(&shooter_servo, shooter_mid_pulse);
+		ret = pwm_set_pulse_dt(&shooter_servo, shooter_min_pulse);
 	} else if (value == 1) {
 		// Set servo to open the 0th (right) hole
 		if (idx == 0) {
-			ret = pwm_set_pulse_dt(&shooter_servo, shooter_max_pulse);
+			ret = pwm_set_pulse_dt(&shooter_servo, shooter_mid_pulse);
 		}
 		// Set servo to open the 1st (left) hole
 		else if (idx == 1) {
-			ret = pwm_set_pulse_dt(&shooter_servo, shooter_min_pulse);
+			ret = pwm_set_pulse_dt(&shooter_servo, shooter_max_pulse);
 		}
 	}
 	if (ret < 0) {
