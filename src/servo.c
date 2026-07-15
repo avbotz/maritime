@@ -54,7 +54,7 @@ void setup_servos()
 	// if (ret < 0) {
 	// 	LOG_ERR("Failed to set pwm pulse for grabber servo, error code %i", ret);
 	// }
-	ret = pwm_set_pulse_dt(&shooter_servo, shooter_mid_pulse);
+	ret = pwm_set_pulse_dt(&shooter_servo, shooter_min_pulse);
 	if (ret < 0) {
 		LOG_ERR("Failed to set pwm pulse for shooter servo, error code %i", ret);
 	}
