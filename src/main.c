@@ -209,7 +209,7 @@ int main(void)
 		int64_t current_time = k_uptime_get();
 		if (current_time - prev_data_time >= 200) {
 			// Kill Switch
-			bool is_alive = !alive();
+			bool is_alive = alive();
 
 			LOG_DBG("raw alive: %d", (int)is_alive);
 
@@ -219,7 +219,7 @@ int main(void)
 				int killed_state = 0;
 
 				for (int i = 0; i < 5; i++) {
-					is_alive = !alive();
+					is_alive = alive();
 					alive_state = is_alive ? alive_state + 1 : alive_state;
 					killed_state = !is_alive ? killed_state + 1 : killed_state;
 					k_sleep(K_MSEC(15));
