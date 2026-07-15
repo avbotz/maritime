@@ -211,7 +211,7 @@ int main(void)
 			// Kill Switch
 			bool is_alive = !alive();
 
-			LOG_DBG("raw alive: %d", is_alive);
+			LOG_DBG("raw alive: %d", (int)is_alive);
 
 			// Software debounce based on moving average
 			if (is_alive != prev_is_alive) {
@@ -219,13 +219,13 @@ int main(void)
 				int killed_state = 0;
 
 				for (int i = 0; i < 5; i++) {
-					is_alive = alive();
+					is_alive = !alive();
 					alive_state = is_alive ? alive_state + 1 : alive_state;
 					killed_state = !is_alive ? killed_state + 1 : killed_state;
 					k_sleep(K_MSEC(15));
 				}
 
-				is_alive = alive_state <= 5;
+				is_alive = alive_state >= 5;
 			}
 
 			if (!prev_is_alive && is_alive) {
