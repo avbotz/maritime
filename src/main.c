@@ -2,7 +2,6 @@
 // Seems to build fine though, though I get editor warnings if the following line is not included
 #define _POSIX_C_SOURCE 200809L
 
-#include "ahrs.h"
 #include "killswitch.h"
 #include "pressure.h"
 #include "thruster.h"
@@ -13,6 +12,7 @@
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/drivers/uart.h>
+#include <zephyr/drivers/watchdog.h>
 #include <zephyr/logging/log.h>
 
 #include <stdio.h>
@@ -28,6 +28,19 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
 BUILD_ASSERT(DT_NODE_HAS_COMPAT(DT_CHOSEN(zephyr_console), zephyr_cdc_acm_uart),
 	     "Console device is not ACM CDC UART device");
+
+#define PROTOCOL_VERSION    2
+/* While running, every thruster goes neutral if no thrust command arrives for this long [ms] */
+#define COMMAND_TIMEOUT_MS  500
+/* Time between kill switch powering up ESCs and thrust commands being sent [ms] */
+#define ESC_INIT_MS         750
+#define KILL_DEBOUNCE_MS    75
+/* Kill switch, depth and heartbeat lines [ms] */
+#define STATE_PERIOD_MS     200
+/* The hardware watchdog timeout [ms] */
+#define WATCHDOG_TIMEOUT_MS 1000
+/* Depth is re-zeroed at a kill switch release only within this of the surface [m] */
+#define REZERO_LIMIT_M      0.5f
 
 static const struct device *usb_device = DEVICE_DT_GET(DT_CHOSEN(zephyr_console));
 
@@ -77,6 +90,139 @@ static void uart_rx_handler(const struct device *dev, void *user_data)
 	}
 }
 
+static int setup_watchdog(const struct device *wdt)
+{
+	if (wdt == NULL || !device_is_ready(wdt)) {
+		LOG_ERR("Watchdog device not ready");
+		return -ENODEV;
+	}
+	const struct wdt_timeout_cfg cfg = {
+		.window = {.min = 0, .max = WATCHDOG_TIMEOUT_MS},
+		.callback = NULL,
+		.flags = WDT_FLAG_RESET_SOC,
+	};
+	int channel = wdt_install_timeout(wdt, &cfg);
+	if (channel < 0) {
+		LOG_ERR("Watchdog install failed: %d", channel);
+		return channel;
+	}
+	int ret = wdt_setup(wdt, WDT_OPT_PAUSE_HALTED_BY_DBG);
+	if (ret < 0) {
+		LOG_ERR("Watchdog setup failed: %d", ret);
+		return ret;
+	}
+	return channel;
+}
+
+/* What the thrusters may do */
+struct thrust_state {
+	/* Released, and the ESCs have had their neutral since: thrust commands are obeyed */
+	bool running;
+	/* A thrust command has arrived since running began, at last_command [ms] */
+	bool commanded;
+	int64_t last_command;
+	/* Times the command watchdog stopped the thrusters */
+	uint32_t command_timeouts;
+};
+
+/* Parses and sends an m, p or a command; false if it is malformed */
+static bool send_thrust_command(char c, char **save_ptr)
+{
+	float value;
+
+	if (c == 'm') {
+		float thrusts[NUM_THRUSTERS];
+		for (int i = 0; i < NUM_THRUSTERS; i++) {
+			if (!parse_float_arg(strtok_r(NULL, " ", save_ptr), &thrusts[i])) {
+				return false;
+			}
+		}
+		send_thrusts(thrusts);
+	} else if (c == 'p') {
+		char *thruster_token = strtok_r(NULL, " ", save_ptr);
+		char *thrust_token = strtok_r(NULL, " ", save_ptr);
+		int thruster;
+
+		if (!parse_int_arg(thruster_token, &thruster) ||
+		    !parse_float_arg(thrust_token, &value)) {
+			return false;
+		}
+		send_thrust(thruster, value);
+
+		LOG_DBG("Setting thruster power: p %d %d\n", thruster, (int)(value * 1000));
+	} else {
+		if (!parse_float_arg(strtok_r(NULL, " ", save_ptr), &value)) {
+			return false;
+		}
+		send_all_thrusts(value);
+	}
+	return true;
+}
+
+static void handle_command(char *msg, struct thrust_state *thrust, int64_t now)
+{
+	char *save_ptr;
+	char *token = strtok_r(msg, " ", &save_ptr);
+	if (!token) {
+		return;
+	}
+	char c = token[0];
+
+	if (c == 'm' || c == 'p' || c == 'a') {
+		if (thrust->running && send_thrust_command(c, &save_ptr)) {
+			thrust->commanded = true;
+			thrust->last_command = now;
+		}
+	} else if (c == 's') {
+		// Usage: s <type> <pulse>
+		// type: g (grabber), t (shooter), d (dropper)
+		// pulse: microseconds (1000 = 1ms)
+		char *type_token = strtok_r(NULL, " ", &save_ptr);
+
+		if (!type_token) {
+			return;
+		}
+
+		char type = type_token[0];
+
+		char *pulse_token = strtok_r(NULL, " ", &save_ptr);
+		int pulse;
+
+		if (!parse_int_arg(pulse_token, &pulse)) {
+			return;
+		}
+
+		// convert to nanoseconds (1000 = 1ms)
+		pulse = pulse * 1000;
+
+		if (type == 'g') {
+			set_pulse(SERVO_GRABBER, pulse);
+		} else if (type == 't') {
+			set_pulse(SERVO_SHOOTER, pulse);
+		} else if (type == 'd') {
+			set_pulse(SERVO_DROPPER, pulse);
+		}
+	} else if (c == 't' || c == 'd') {
+		char *selector_token = strtok_r(NULL, " ", &save_ptr);
+		char *state_token = strtok_r(NULL, " ", &save_ptr);
+
+		if (!selector_token || !state_token) {
+			return;
+		}
+
+		int selector = selector_token[0] == '1';
+		int state = state_token[0] == '1';
+
+		(c == 't' ? shoot : drop)(selector, state);
+	}
+#ifdef CONFIG_BOARD_RPI_PICO
+	else if (c == 'r') {
+		stop_thrusters();
+		reset_usb_boot(0, 0);
+	}
+#endif
+}
+
 int main(void)
 {
 	if (!device_is_ready(usb_device)) {
@@ -90,196 +236,97 @@ int main(void)
 	setup_thrusters();
 	setup_servos();
 	setup_pressure();
-	setup_ahrs();
 
-	float init_thrusters[8] = {0.0f};
+	// Neutral until the kill switch is released and the ESCs have initialized
+	stop_thrusters();
 
-	send_thrusts(init_thrusters);
-
-	// Provide initialize pulse to ESCs
-	// https://docs.bluerobotics.com/bluesc/#:~:text=Provide%20a%20%E2%80%9Cstopped%E2%80%9D%20signal%20at%201500%20%CE%BCs%20for%20a%20few%20seconds
-	k_sleep(K_SECONDS(2));
+	const struct device *wdt = DEVICE_DT_GET_OR_NULL(DT_ALIAS(watchdog0));
+	const int wdt_channel = setup_watchdog(wdt);
 
 	char msg[MSG_SIZE];
-	bool prev_is_alive = false;
-	int64_t prev_data_time = k_uptime_get();
-	int64_t prev_imu_data_time = k_uptime_get();
-	// Latest AHRS sample; holds the previous value when no new message has
-	// been published since the last read
-	struct ahrs_data_s ahrs_data = {0};
+	struct thrust_state thrust = {0};
+	// The kill switch as read, since when, and as debounced. Starts killed, whatever it
+	// reads, and a release counts only after the switch has read killed since boot: a
+	// board that resets mid-run (brownout, watchdog) stays killed until someone cycles
+	// the switch, rather than driving again on its own.
+	int64_t now = k_uptime_get();
+	bool raw_alive = alive();
+	int64_t raw_since = now;
+	bool released = false;
+	bool seen_killed = false;
+	int64_t esc_ready_at = 0;
+	int64_t next_state = now;
 
 	while (true) {
-		LOG_DBG("Recieved command: %s", msg);
-
-		if (k_msgq_get(&uart_msgq, msg, K_NO_WAIT) == 0) {
-			char *save_ptr;
-			char *token = strtok_r(msg, " ", &save_ptr);
-			if (!token) {
-				continue;
-			}
-			char c = token[0];
-
-			if (c == 'p') {
-				char *thruster_token = strtok_r(NULL, " ", &save_ptr);
-				char *thrust_token = strtok_r(NULL, " ", &save_ptr);
-				int thruster;
-				float thrust;
-
-				if (!parse_int_arg(thruster_token, &thruster) ||
-				    !parse_float_arg(thrust_token, &thrust)) {
-					continue;
-				}
-
-				send_thrust(thruster, thrust);
-
-				LOG_DBG("Setting thruster power: p %d %d\n", thruster,
-					(int)(thrust * 1000));
-			} else if (c == 'a') {
-				char *thrust_token = strtok_r(NULL, " ", &save_ptr);
-				float thrust;
-
-				if (!parse_float_arg(thrust_token, &thrust)) {
-					continue;
-				}
-
-				float thrusts[8] = {thrust, thrust, thrust, thrust,
-						    thrust, thrust, thrust, thrust};
-				send_thrusts(thrusts);
-			} else if (c == 's') {
-				// Usage: s <type> <pulse>
-				// type: g (grabber), t (shooter), d (dropper)
-				// pulse: microseconds (1000 = 1ms)
-				char *type_token = strtok_r(NULL, " ", &save_ptr);
-
-				if (!type_token) {
-					continue;
-				}
-
-				char type = type_token[0];
-
-				char *pulse_token = strtok_r(NULL, " ", &save_ptr);
-				int pulse;
-
-				if (!parse_int_arg(pulse_token, &pulse)) {
-					continue;
-				}
-
-				// convert to nanoseconds (1000 = 1ms)
-				pulse = pulse * 1000;
-
-				if (type == 'g') {
-					set_pulse(SERVO_GRABBER, pulse);
-				} else if (type == 't') {
-					set_pulse(SERVO_SHOOTER, pulse);
-				} else if (type == 'd') {
-					set_pulse(SERVO_DROPPER, pulse);
-				}
-			} else if (c == 't') {
-				char *selector_token = strtok_r(NULL, " ", &save_ptr);
-				char *state_token = strtok_r(NULL, " ", &save_ptr);
-
-				if (!selector_token || !state_token) {
-					continue;
-				}
-
-				int selector = selector_token[0] == '1' ? 1 : 0;
-				int state = state_token[0] == '1' ? 1 : 0;
-
-				shoot(selector, state);
-			} else if (c == 'd') {
-				char *selector_token = strtok_r(NULL, " ", &save_ptr);
-				char *state_token = strtok_r(NULL, " ", &save_ptr);
-
-				if (!selector_token || !state_token) {
-					continue;
-				}
-
-				int selector = selector_token[0] == '1' ? 1 : 0;
-				int state = state_token[0] == '1' ? 1 : 0;
-
-				drop(selector, state);
-			}
-#ifdef CONFIG_BOARD_RPI_PICO
-			else if (c == 'r') {
-				reset_usb_boot(0, 0);
-			}
-#endif
+		now = k_uptime_get();
+		if (wdt_channel >= 0) {
+			wdt_feed(wdt, wdt_channel);
 		}
 
-		int64_t current_time = k_uptime_get();
-		if (current_time - prev_data_time >= 200) {
-			// Kill Switch
-			bool is_alive = alive();
-
-			LOG_DBG("raw alive: %d", (int)is_alive);
-
-			// Software debounce based on moving average
-			if (is_alive != prev_is_alive) {
-				int alive_state = 0;
-				int killed_state = 0;
-
-				for (int i = 0; i < 5; i++) {
-					is_alive = alive();
-					alive_state = is_alive ? alive_state + 1 : alive_state;
-					killed_state = !is_alive ? killed_state + 1 : killed_state;
-					k_sleep(K_MSEC(15));
-				}
-
-				is_alive = alive_state >= 5;
-			}
-
-			if (!prev_is_alive && is_alive) {
-				// Provide initialize pulse to ESCs
-				k_sleep(K_SECONDS(2));
-
-				reset_reference();
-			}
-
-			printk(is_alive ? "x 0\n" : "x 1\n");
-
-			if (!is_alive) {
-				send_thrusts(init_thrusters);
-			}
-
-			prev_is_alive = is_alive;
-
-			// Pressure Sensor
-			float depth_m = get_depth_meters();
-			// the pico does not support floating point formatting in printk, so we need
-			// to convert to integer parts
-			int depth_m_int = abs((int)depth_m);
-			int depth_m_frac = abs((int)((depth_m - depth_m_int) * 1000));
-
-			if (depth_m >= 0) {
-				printk("d %d.%03d\n", depth_m_int, depth_m_frac);
+		// Kill switch: a new reading counts once it has held for KILL_DEBOUNCE_MS
+		bool reading = alive();
+		if (reading != raw_alive) {
+			raw_alive = reading;
+			raw_since = now;
+		}
+		const bool settled = now - raw_since >= KILL_DEBOUNCE_MS;
+		if (settled && !raw_alive) {
+			seen_killed = true;
+		}
+		if (settled && raw_alive != released && seen_killed) {
+			released = raw_alive;
+			if (released) {
+				// The switch powers the ESCs up: they need neutral first
+				esc_ready_at = now + ESC_INIT_MS;
 			} else {
-				printk("d -%d.%03d\n", depth_m_int, depth_m_frac);
+				thrust.running = false;
+				thrust.commanded = false;
+				stop_thrusters();
+			}
+		}
+		if (released && !thrust.running && now >= esc_ready_at) {
+			thrust.running = true;
+			thrust.commanded = false;
+			// The surface for this run, unless released underwater
+			rezero_near_surface(REZERO_LIMIT_M);
+		}
+
+		while (k_msgq_get(&uart_msgq, msg, K_NO_WAIT) == 0) {
+			handle_command(msg, &thrust, now);
+		}
+
+		// The host stopped commanding (crashed, unplugged): stop rather than keep
+		// driving on the last command
+		if (thrust.running && thrust.commanded &&
+		    now - thrust.last_command > COMMAND_TIMEOUT_MS) {
+			stop_thrusters();
+			thrust.commanded = false;
+			thrust.command_timeouts++;
+		}
+
+		if (now >= next_state) {
+			next_state = now + STATE_PERIOD_MS;
+			if (!thrust.running) {
+				stop_thrusters();
 			}
 
-			int depth_raw = get_raw_pressure();
+			// Reported released only once thrust commands are obeyed
+			printk(thrust.running ? "x 0\n" : "x 1\n");
 
-			LOG_DBG("q %d\n", depth_raw);
+			// No line rather than a made-up depth if the sensor cannot be read
+			float depth_m;
+			if (get_depth_meters(&depth_m) == 0) {
+				char depth_s[24];
+				format_float(depth_m, depth_s, sizeof(depth_s));
+				printk("d %s\n", depth_s);
+			}
 
-			prev_data_time = current_time;
+			printk("h %d %u %u\n", PROTOCOL_VERSION, (uint32_t)now,
+			       thrust.command_timeouts);
 		}
 
-		if (current_time - prev_imu_data_time >= 25) {
-			// AHRS publishes NED angles in radians; convert to degrees
-			// for the serial protocol
-			k_msgq_get(&ahrs_data_msgq, &ahrs_data, K_NO_WAIT);
-
-			char roll_s[16], pitch_s[16], yaw_s[16];
-			format_float((float)ahrs_data.roll, roll_s, sizeof(roll_s));
-			format_float((float)ahrs_data.pitch, pitch_s, sizeof(pitch_s));
-			format_float((float)ahrs_data.yaw, yaw_s, sizeof(yaw_s));
-
-			printk("i %s %s %s\n", roll_s, pitch_s, yaw_s);
-
-			prev_imu_data_time = current_time;
-		}
-
-		// Yield so lower-priority threads (AHRS frame processing, log
-		// thread) get CPU time; without this the busy loop starves them
+		// Yield so lower-priority threads (log thread) get CPU time; without
+		// this the busy loop starves them
 		k_sleep(K_MSEC(1));
 	}
 

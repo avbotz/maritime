@@ -5,6 +5,10 @@
 
 #include "pressure.h"
 
+#include <errno.h>
+#include <math.h>
+#include <stdbool.h>
+
 LOG_MODULE_REGISTER(pressure, LOG_LEVEL_DBG);
 
 static const struct adc_dt_spec adc_channel = ADC_DT_SPEC_GET_BY_IDX(DT_PATH(zephyr_user), 0);
@@ -15,8 +19,17 @@ static struct adc_sequence sequence = {
 	.buffer_size = sizeof(sample_buf),
 };
 
-/* Raw ADC reading taken at startup, assumed to be at the surface */
+/* Raw ADC reading at the surface: taken at startup, and again at each kill switch release
+ * near the surface */
 static int initial_sample;
+static bool have_initial_sample;
+
+/* Raw readings averaged into one, and how many tries they get */
+#define PRESSURE_SAMPLES   10
+#define PRESSURE_MAX_READS 30
+
+/* ADC counts per metre of water, from a linear fit of readings against measured depth */
+#define COUNTS_PER_METER 365.0f
 
 int get_raw_pressure()
 {
@@ -29,18 +42,21 @@ int get_raw_pressure()
 	return sample_buf;
 }
 
-int get_raw_averaged_pressure()
+/* The mean of PRESSURE_SAMPLES good readings, or -EIO if the ADC does not give that many
+ * in PRESSURE_MAX_READS tries (a disconnected sensor reads 0). Bounded, so a dead sensor
+ * cannot hang the main loop and with it the thruster watchdog. */
+static int get_raw_averaged_pressure()
 {
 	int sum = 0;
-	for (int i = 0; i < 10; i++) {
+	int good = 0;
+	for (int i = 0; i < PRESSURE_MAX_READS && good < PRESSURE_SAMPLES; i++) {
 		int raw = get_raw_pressure();
-		if (raw <= 0) {
-			i--;
-			continue;
+		if (raw > 0) {
+			sum += raw;
+			good++;
 		}
-		sum += raw;
 	}
-	return sum / 10;
+	return good == PRESSURE_SAMPLES ? sum / good : -EIO;
 }
 
 int setup_pressure()
@@ -62,40 +78,43 @@ int setup_pressure()
 		return ret;
 	}
 
-	initial_sample = get_raw_averaged_pressure();
-	if (initial_sample < 0) {
-		return -1;
-	}
+	return reset_reference();
+}
 
-	LOG_DBG("Surface pressure: %d", initial_sample);
-
-	return 0;
+static float raw_to_depth(int raw)
+{
+	return (float)(raw - initial_sample) / COUNTS_PER_METER;
 }
 
 int reset_reference()
 {
-	initial_sample = get_raw_averaged_pressure();
-	if (initial_sample < 0) {
-		return -1;
+	return rezero_near_surface(INFINITY);
+}
+
+int rezero_near_surface(float limit_m)
+{
+	int sample = get_raw_averaged_pressure();
+	if (sample < 0) {
+		return sample;
 	}
+	if (have_initial_sample && fabsf(raw_to_depth(sample)) > limit_m) {
+		return -ERANGE;
+	}
+	initial_sample = sample;
+	have_initial_sample = true;
 	LOG_DBG("Surface pressure: %d", initial_sample);
 	return 0;
 }
 
-float raw_pressure_to_depth(int raw_pressure, int initial_sample)
+int get_depth_meters(float *depth_m)
 {
-	return (raw_pressure - initial_sample) / 365.0;
-}
-
-float get_depth_meters()
-{
-	int raw = get_raw_averaged_pressure();
-
-	LOG_DBG("Raw pressure: %d", raw);
-
-	if (raw > 0) {
-		return raw_pressure_to_depth(raw, initial_sample);
+	if (!have_initial_sample) {
+		return -EIO;
 	}
-
-	return -1.0f;
+	int raw = get_raw_averaged_pressure();
+	if (raw < 0) {
+		return -EIO;
+	}
+	*depth_m = raw_to_depth(raw);
+	return 0;
 }
