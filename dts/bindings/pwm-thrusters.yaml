@@ -1,0 +1,16 @@
+description: |
+  PWM-driven ESC thrusters, one child node per thruster. thruster.c refers to the
+  children by node label (thruster0 to thruster7).
+
+compatible: "pwm-thrusters"
+
+include: base.yaml
+
+child-binding:
+  description: One thruster's ESC signal line.
+
+  properties:
+    pwms:
+      required: true
+      type: phandle-array
+      description: PWM specifier driving the thruster's ESC.

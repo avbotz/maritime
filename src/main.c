@@ -49,6 +49,8 @@ K_MSGQ_DEFINE(uart_msgq, MSG_SIZE, 10, 1);
 
 static char rx_buf[MSG_SIZE];
 static size_t rx_pos = 0;
+/* The line overran rx_buf: the rest of it is dropped up to its newline */
+static bool rx_overflow = false;
 
 // the pico does not support floating point formatting in printk, so we need to
 // convert to integer parts
@@ -75,15 +77,16 @@ static void uart_rx_handler(const struct device *dev, void *user_data)
 			}
 
 			if (c == '\n' || c == '\r') {
-				if (rx_pos > 0) {
+				if (rx_pos > 0 && !rx_overflow) {
 					rx_buf[rx_pos] = '\0';
 					k_msgq_put(&uart_msgq, rx_buf, K_NO_WAIT);
-					rx_pos = 0;
 				}
+				rx_pos = 0;
+				rx_overflow = false;
 			} else if (rx_pos < MSG_SIZE - 1) {
 				rx_buf[rx_pos++] = (char)c;
 			} else {
-				rx_pos = 0;
+				rx_overflow = true;
 			}
 		}
 		uart_irq_update(dev);
@@ -174,33 +177,27 @@ static void handle_command(char *msg, struct thrust_state *thrust, int64_t now)
 			thrust->last_command = now;
 		}
 	} else if (c == 's') {
-		// Usage: s <type> <pulse>
+		// Usage: s <type> <pulse_us>
 		// type: g (grabber), t (shooter), d (dropper)
-		// pulse: microseconds (1000 = 1ms)
+		// pulse_us: microseconds, clamped to the servo's range from the overlay
 		char *type_token = strtok_r(NULL, " ", &save_ptr);
-
-		if (!type_token) {
-			return;
-		}
-
-		char type = type_token[0];
-
 		char *pulse_token = strtok_r(NULL, " ", &save_ptr);
-		int pulse;
+		int pulse_us;
 
-		if (!parse_int_arg(pulse_token, &pulse)) {
+		if (!type_token || !parse_int_arg(pulse_token, &pulse_us)) {
 			return;
 		}
 
-		// convert to nanoseconds (1000 = 1ms)
-		pulse = pulse * 1000;
-
-		if (type == 'g') {
-			set_pulse(SERVO_GRABBER, pulse);
-		} else if (type == 't') {
-			set_pulse(SERVO_SHOOTER, pulse);
-		} else if (type == 'd') {
-			set_pulse(SERVO_DROPPER, pulse);
+		switch (type_token[0]) {
+		case 'g':
+			set_pulse(SERVO_GRABBER, pulse_us);
+			break;
+		case 't':
+			set_pulse(SERVO_SHOOTER, pulse_us);
+			break;
+		case 'd':
+			set_pulse(SERVO_DROPPER, pulse_us);
+			break;
 		}
 	} else if (c == 't' || c == 'd') {
 		char *selector_token = strtok_r(NULL, " ", &save_ptr);
