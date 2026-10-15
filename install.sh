@@ -2,12 +2,6 @@
 
 set -euo pipefail
 
-mkdir -p maritime-workspace
-cd maritime-workspace
-
-git clone https://github.com/avbotz/maritime
-cd maritime
-
 sudo apt-get update
 
 sudo apt-get install --no-install-recommends -y git cmake ninja-build gperf \
@@ -15,11 +9,17 @@ sudo apt-get install --no-install-recommends -y git cmake ninja-build gperf \
     python3-tk xz-utils file make gcc libsdl2-dev libmagic1
 
 if [ "$(uname -m)" != "aarch64" ]; then
-    sudo apt-get install --no-instal-recommends -y gcc-multilib g++-multilib
+    sudo apt-get install --no-install-recommends -y gcc-multilib g++-multilib
 fi
+
+mkdir -p maritime-workspace
+cd maritime-workspace
 
 python3 -m venv .venv
 source .venv/bin/activate
+
+git clone https://github.com/avbotz/maritime
+cd maritime
 
 pip install --upgrade pip
 pip install west
@@ -31,4 +31,5 @@ west update
 
 west packages pip --install
 
-west sdk install
+# Only the Arm toolchain, rather than one for every architecture
+west sdk install -t arm-zephyr-eabi

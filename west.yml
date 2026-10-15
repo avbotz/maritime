@@ -6,6 +6,10 @@ manifest:
     - name: zephyr
       remote: zephyrproject-rtos
       revision: v4.4.0
-      import: true
+      # Only the modules an RP2040 build uses, rather than every vendor's HAL
+      import:
+        name-allowlist:
+          - cmsis_6
+          - hal_rpi_pico
   self:
     path: maritime

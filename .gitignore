@@ -1,12 +1,9 @@
-.vscode/*  # ignores additional temporary files vscode generates
-
-/.west
-/bootloader
-/modules
-/tools
-/zephyr
-/build
-/maritime_ec
+# editor files
 *.swp
+.vscode/
+.zed/
 
-.cache
+# Zephyr build files
+/.cache
+/.west
+/build
