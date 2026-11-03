@@ -4,9 +4,9 @@ set -euo pipefail
 
 sudo apt-get update
 
-sudo apt-get install --no-install-recommends -y git cmake ninja-build gperf \
-    ccache dfu-util device-tree-compiler wget python3-dev python3-venv \
-    python3-tk xz-utils file make gcc libsdl2-dev libmagic1
+sudo apt-get install --no-install-recommends -y git cmake ninja-build clang-format \
+    gperf ccache dfu-util device-tree-compiler wget python3-dev python3-venv \
+    python3-tk xz-utils file make gcc libsdl2-dev libmagic1 nodejs npm
 
 if [ "$(uname -m)" != "aarch64" ]; then
     sudo apt-get install --no-install-recommends -y gcc-multilib g++-multilib
@@ -33,3 +33,13 @@ west packages pip --install
 
 # Only the Arm toolchain, rather than one for every architecture
 west sdk install -t arm-zephyr-eabi
+
+# dts-linter for format.sh, at the version zephyr pins
+npm --prefix ../zephyr/scripts/ci ci
+
+# Check formatting and style before each commit (skip with git commit --no-verify)
+cat > .git/hooks/pre-commit << 'EOF'
+#!/bin/sh
+exec ./format.sh --check
+EOF
+chmod +x .git/hooks/pre-commit

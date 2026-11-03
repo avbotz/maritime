@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MIT */
+
 #include "thruster.h"
 
 #include <zephyr/kernel.h>
@@ -26,11 +28,13 @@ static const struct pwm_dt_spec *thruster_devices[NUM_THRUSTERS] = {
 
 static const uint32_t THRUSTER_MIN_PULSE = 1100;
 static const uint32_t THRUSTER_MAX_PULSE = 1900;
-/* Hard ceiling on |thrust|: 1260-1740 us to the Basic ESCs. thalassic's sub_control
- * (MAX_POWER_LIMIT) and sub_low (MAX_COMMAND) clamp to the same value. */
+/*
+ * Hard ceiling on |thrust|: 1260-1740 us to the Basic ESCs. thalassic's sub_control
+ * (MAX_POWER_LIMIT) and sub_low (MAX_COMMAND) clamp to the same value.
+ */
 static const float MAX_POWER = 0.6f;
 
-int setup_thrusters()
+int setup_thrusters(void)
 {
 	for (int i = 0; i < NUM_THRUSTERS; i++) {
 		if (!device_is_ready(thruster_devices[i]->dev)) {
@@ -77,6 +81,7 @@ void send_thrust(int thruster, float thrust)
 			   THRUSTER_MIN_PULSE);
 
 	int ret = pwm_set_pulse_dt(thruster_devices[thruster], PWM_USEC(pulse_width));
+
 	if (ret < 0) {
 		LOG_DBG("Failed to set pulse for thruster %d, error code %i", thruster, ret);
 	}

@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MIT */
+
 /* Servos control the ball dropper, torpedo shooter, grabber */
 #include "servo.h"
 
@@ -7,6 +9,7 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/pwm.h>
 #include <zephyr/logging/log.h>
+#include <stdalign.h>
 
 #include <errno.h>
 #include <stdint.h>
@@ -41,7 +44,7 @@ static const uint32_t grabber_max_pulse = DT_PROP(DT_NODELABEL(grabber_servo), m
  * max pulse = max angle = right hole
  */
 
-void setup_servos()
+void setup_servos(void)
 {
 	/* Set all of the servos to go to the middle (neutral) position */
 	if (!device_is_ready(dropper_servo.dev)) {
@@ -53,6 +56,7 @@ void setup_servos()
 	}
 
 	int ret = pwm_set_pulse_dt(&dropper_servo, dropper_mid_pulse);
+
 	if (ret < 0) {
 		LOG_ERR("Failed to set pwm pulse for dropper servo, error code %i", ret);
 	}
@@ -72,8 +76,10 @@ void setup_servos()
 #endif
 }
 
-/* pulse_us clamped to [min_ns, max_ns], as nanoseconds. Clamped in us so the host cannot
- * overflow the conversion. */
+/*
+ * pulse_us clamped to [min_ns, max_ns], as nanoseconds. Clamped in us so the host cannot overflow
+ * the conversion.
+ */
 static uint32_t clamp_pulse(int pulse_us, uint32_t min_ns, uint32_t max_ns)
 {
 	const int min_us = min_ns / NSEC_PER_USEC;
@@ -108,6 +114,7 @@ int set_pulse(enum servo_type type, int pulse_us)
 	}
 
 	int ret = pwm_set_pulse_dt(servo, pulse_ns);
+
 	if (ret < 0) {
 		LOG_ERR("Failed to set pulse width for servo %d, error code %i", type, ret);
 	}
@@ -120,15 +127,15 @@ void drop(int idx, int value)
 
 	int ret = 0;
 
-	// If requested, set servo to neutral position
+	/* If requested, set servo to neutral position */
 	if (value == 0) {
 		ret = pwm_set_pulse_dt(&dropper_servo, dropper_mid_pulse);
 	} else if (value == 1) {
-		// Set servo to drop the 0th (right) ball
+		/* Set servo to drop the 0th (right) ball */
 		if (idx == 0) {
 			ret = pwm_set_pulse_dt(&dropper_servo, dropper_max_pulse);
 		}
-		// Set servo to drop the 1st (left) ball
+		/* Set servo to drop the 1st (left) ball */
 		else if (idx == 1) {
 			ret = pwm_set_pulse_dt(&dropper_servo, dropper_min_pulse);
 		}
@@ -139,36 +146,40 @@ void drop(int idx, int value)
 	}
 }
 
-// void grab(float value)
-//{
-//	/*
-//	 * value = the fraction of closed you grabber to be (0 to 1).
-//	 * Eg. value = 0.6 = 60% closed grabber.
-//	 */
-//	LOG_DBG("Opened grab for %f", value);
-//	uint32_t pulse_width =
-//		(uint32_t)(grabber_min_pulse + value * (grabber_max_pulse - grabber_min_pulse));
-//	int ret = pwm_set_pulse_dt(&grabber_servo, pulse_width);
-//	// int ret = pwm_set_pulse_dt(&shooter_servo, value);
-//	LOG_DBG("Pulse width %i", pulse_width);
-//	if (ret < 0) {
-//		LOG_ERR("Failed to set pulse width for grabber, error code %i", ret);
-//	}
-// }
+#if HAVE_GRABBER
+void grab(float value)
+{
+	/*
+	 * value = the fraction of closed you grabber to be (0 to 1).
+	 * Eg. value = 0.6 = 60% closed grabber.
+	 */
+	LOG_DBG("Setting grabber to %f", value);
+
+	uint32_t pulse_width =
+		(uint32_t)(grabber_min_pulse + value * (grabber_max_pulse - grabber_min_pulse));
+
+	int ret = pwm_set_pulse_dt(&grabber_servo, pulse_width);
+
+	LOG_DBG("Pulse width %i", pulse_width);
+	if (ret < 0) {
+		LOG_ERR("Failed to set pulse width/ for grabber, error code %i", ret);
+	}
+}
+#endif
 
 void shoot(int idx, int value)
 {
-	LOG_DBG("Opened shoot for %i %i", idx, value);
+	LOG_DBG("Set torpedo %i to %i", idx, value);
 	int ret = 0;
-	// If requested, set servo to neutral position (closes both holes)
+	/* If requested, set servo to neutral position (closes both holes) */
 	if (value == 0) {
 		ret = pwm_set_pulse_dt(&shooter_servo, shooter_min_pulse);
 	} else if (value == 1) {
-		// Set servo to open the 0th (right) hole
+		/* Set servo to open the 0th (right) hole */
 		if (idx == 0) {
 			ret = pwm_set_pulse_dt(&shooter_servo, shooter_mid_pulse);
 		}
-		// Set servo to open the 1st (left) hole
+		/* Set servo to open the 1st (left) hole */
 		else if (idx == 1) {
 			ret = pwm_set_pulse_dt(&shooter_servo, shooter_max_pulse);
 		}

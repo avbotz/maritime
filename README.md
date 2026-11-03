@@ -31,6 +31,19 @@ west build -b rpi_pico
 west flash -r uf2
 ```
 
+## Formatting
+
+```sh
+./format.sh         (format C and devicetree, report checkpatch issues)
+./format.sh --check (change nothing, fail if anything needs fixing)
+```
+
+checkpatch issues, such as `//` comments, must be fixed by hand. The installer adds a pre-commit hook that runs `./format.sh --check`. For a clone made before the hook was added, run:
+```sh
+npm --prefix ../zephyr/scripts/ci ci
+printf '#!/bin/sh\nexec ./format.sh --check\n' > .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+```
+
 ## Startup
 
 After building and flashing, run tmux in a terminal. Split the tmux window into two panes. Run "cat < /dev/ttyACM*" in one and "cat > /dev/ttyACM*" in the other. The former pane is the DISPLAY pane, it will show the output from maritime. The latter is the COMMAND pane, it is where maritime receives its input.
