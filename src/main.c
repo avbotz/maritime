@@ -66,6 +66,7 @@ static void handle_frame(const struct frame *frame, struct thrust_state *thrust,
 		}
 
 		servo_shoot(payload[0], payload[1]);
+		break;
 	case MSG_DROPPER:
 		if (payload[0] > 1 || payload[1] > 1) {
 			break;

@@ -150,27 +150,6 @@ void servo_drop(int idx, int value)
 	}
 }
 
-#if HAVE_GRABBER
-void servo_grab(float value)
-{
-	/*
-	 * value = the fraction of closed you grabber to be (0 to 1).
-	 * Eg. value = 0.6 = 60% closed grabber.
-	 */
-	LOG_DBG("Setting grabber to %f", value);
-
-	uint32_t pulse_width =
-		(uint32_t)(grabber_min_pulse + value * (grabber_max_pulse - grabber_min_pulse));
-
-	int ret = pwm_set_pulse_dt(&grabber_servo, pulse_width);
-
-	LOG_DBG("Pulse width %i", pulse_width);
-	if (ret < 0) {
-		LOG_ERR("Failed to set pulse width/ for grabber, error code %i", ret);
-	}
-}
-#endif
-
 void servo_shoot(int idx, int value)
 {
 	LOG_DBG("Set torpedo %i to %i", idx, value);
@@ -192,3 +171,24 @@ void servo_shoot(int idx, int value)
 		LOG_ERR("Failed to shooter pwm pulse, error code %i", ret);
 	}
 }
+
+#if HAVE_GRABBER
+void servo_grab(float value)
+{
+	/*
+	 * value = the fraction of closed you grabber to be (0 to 1).
+	 * Eg. value = 0.6 = 60% closed grabber.
+	 */
+	LOG_DBG("Setting grabber to %f", value);
+
+	uint32_t pulse_width =
+		(uint32_t)(grabber_min_pulse + value * (grabber_max_pulse - grabber_min_pulse));
+
+	int ret = pwm_set_pulse_dt(&grabber_servo, pulse_width);
+
+	LOG_DBG("Pulse width %i", pulse_width);
+	if (ret < 0) {
+		LOG_ERR("Failed to set pulse width/ for grabber, error code %i", ret);
+	}
+}
+#endif
