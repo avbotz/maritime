@@ -18,7 +18,7 @@ enum killswitch_state {
  * Configures the pin and starts over at KILLSWITCH_NEEDS_CYCLE. If it fails, the switch
  * reads killed from then on.
  */
-int setup_killswitch(void);
+int killswitch_init(void);
 /*
  * Reads the switch at `now` [ms] and returns its debounced state. Called every ms or so, and
  * only ever from one thread: a reading holds from the first call that sees it to the last.

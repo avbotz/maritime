@@ -23,7 +23,7 @@ static int64_t raw_since;
 static bool seen_killed;
 static bool released;
 
-int setup_killswitch(void)
+int killswitch_init(void)
 {
 	sampled = false;
 	seen_killed = false;

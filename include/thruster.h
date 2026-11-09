@@ -3,11 +3,10 @@
 
 #define NUM_THRUSTERS 8
 
-int setup_thrusters(void);
-void send_thrusts(const float thrusts[NUM_THRUSTERS]);
-void send_thrust(int thruster, float thrust);
-void send_all_thrusts(float thrust);
-/* Every thruster to neutral (1500 us) */
-void stop_thrusters(void);
+int thruster_init(void);
+void thruster_send(int thruster, float thrust);
+void thruster_send_all(const float thrusts[NUM_THRUSTERS]);
+void thruster_send_all_uniform(float thrust);
+void thruster_stop(void);
 
 #endif /* _MARITIME_THRUSTER_H */

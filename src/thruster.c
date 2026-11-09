@@ -22,7 +22,7 @@ static const uint32_t THRUSTER_MAX_PULSE = 1900;
 /* Maximum of |thrust|. Corresponds to 1260-1740 us to the Basic ESCs. */
 static const float MAX_POWER = 0.6f;
 
-int setup_thrusters(void)
+int thruster_init(void)
 {
 	for (int i = 0; i < NUM_THRUSTERS; i++) {
 		if (!device_is_ready(thruster_devices[i].dev)) {
@@ -33,26 +33,26 @@ int setup_thrusters(void)
 	return 0;
 };
 
-void send_thrusts(const float thrusts[NUM_THRUSTERS])
+void thruster_send_all(const float thrusts[NUM_THRUSTERS])
 {
 	for (int i = 0; i < NUM_THRUSTERS; i++) {
-		send_thrust(i, thrusts[i]);
+		thruster_send(i, thrusts[i]);
 	}
 };
 
-void send_all_thrusts(float thrust)
+void thruster_send_all_uniform(float thrust)
 {
 	for (int i = 0; i < NUM_THRUSTERS; i++) {
-		send_thrust(i, thrust);
+		thruster_send(i, thrust);
 	}
 }
 
-void stop_thrusters(void)
+void thruster_stop(void)
 {
-	send_all_thrusts(0.0f);
+	thruster_send_all_uniform(0.0f);
 }
 
-void send_thrust(int thruster, float thrust)
+void thruster_send(int thruster, float thrust)
 {
 	if (thruster < 0 || thruster >= NUM_THRUSTERS) {
 		return;

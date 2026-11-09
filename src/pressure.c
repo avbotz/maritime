@@ -32,7 +32,7 @@ static bool have_initial_sample;
 /* ADC counts per metre of water, from a linear fit of readings against measured depth */
 #define COUNTS_PER_METER 365.0f
 
-int setup_pressure(void)
+int pressure_init(void)
 {
 	if (!adc_is_ready_dt(&adc_channel)) {
 		LOG_ERR("ADC controller %s not ready", adc_channel.dev->name);
@@ -53,10 +53,10 @@ int setup_pressure(void)
 		return ret;
 	}
 
-	return reset_reference();
+	return pressure_reset_reference();
 }
 
-int get_raw_pressure(void)
+int pressure_get_raw(void)
 {
 	int ret = adc_read_dt(&adc_channel, &sequence);
 
@@ -79,7 +79,7 @@ static int get_raw_averaged_pressure(void)
 	int good = 0;
 
 	for (int i = 0; i < PRESSURE_MAX_READS && good < PRESSURE_SAMPLES; i++) {
-		int raw = get_raw_pressure();
+		int raw = pressure_get_raw();
 
 		if (raw > 0) {
 			sum += raw;
@@ -95,12 +95,12 @@ static float raw_to_depth(int raw)
 	return (float)(raw - initial_sample) / COUNTS_PER_METER;
 }
 
-int reset_reference(void)
+int pressure_reset_reference(void)
 {
-	return rezero_near_surface(INFINITY);
+	return pressure_rezero_near_surface(INFINITY);
 }
 
-int rezero_near_surface(float limit_m)
+int pressure_rezero_near_surface(float limit_m)
 {
 	int sample = get_raw_averaged_pressure();
 
@@ -119,7 +119,7 @@ int rezero_near_surface(float limit_m)
 	return 0;
 }
 
-int get_depth_meters(float *depth_m)
+int pressure_get_depth_m(float *depth_m)
 {
 	if (!have_initial_sample) {
 		return -EIO;

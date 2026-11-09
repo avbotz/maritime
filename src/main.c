@@ -55,17 +55,23 @@ static void handle_frame(const struct frame *frame, struct thrust_state *thrust,
 		for (int i = 0; i < NUM_THRUSTERS; i++) {
 			thrusts[i] = protocol_get_f32(&payload[4 * i]);
 		}
-		send_thrusts(thrusts);
+		thruster_send_all(thrusts);
 		thrust->commanded = true;
 		thrust->last_command = now;
 		break;
 	}
 	case MSG_TORPEDO:
+		if (payload[0] > 1 || payload[1] > 1) {
+			break;
+		}
+
+		servo_shoot(payload[0], payload[1]);
 	case MSG_DROPPER:
 		if (payload[0] > 1 || payload[1] > 1) {
 			break;
 		}
-		(frame->type == MSG_TORPEDO ? shoot : drop)(payload[0], payload[1]);
+
+		servo_drop(payload[0], payload[1]);
 		break;
 	case MSG_SERVO: {
 		/* Clamped to the servo's range from the overlay */
@@ -73,13 +79,13 @@ static void handle_frame(const struct frame *frame, struct thrust_state *thrust,
 
 		switch (payload[0]) {
 		case SERVO_ID_DROPPER:
-			set_pulse(SERVO_DROPPER, pulse_us);
+			servo_set_pulse(SERVO_DROPPER, pulse_us);
 			break;
 		case SERVO_ID_GRABBER:
-			set_pulse(SERVO_GRABBER, pulse_us);
+			servo_set_pulse(SERVO_GRABBER, pulse_us);
 			break;
 		case SERVO_ID_SHOOTER:
-			set_pulse(SERVO_SHOOTER, pulse_us);
+			servo_set_pulse(SERVO_SHOOTER, pulse_us);
 			break;
 		}
 		break;
@@ -87,7 +93,7 @@ static void handle_frame(const struct frame *frame, struct thrust_state *thrust,
 #ifdef CONFIG_BOARD_RPI_PICO
 	case MSG_BOOTLOADER:
 		if (sys_get_le32(payload) == BOOTLOADER_MAGIC) {
-			stop_thrusters();
+			thruster_stop();
 			reset_usb_boot(0, 0);
 		}
 		break;
@@ -100,7 +106,7 @@ static void send_state(const struct thrust_state *thrust, int64_t now)
 	uint8_t payload[STATE_SIZE];
 	/* Left 0 and flagged invalid, rather than made up, if the sensor cannot be read */
 	float depth_m = 0.0f;
-	const bool depth_valid = get_depth_meters(&depth_m) == 0;
+	const bool depth_valid = pressure_get_depth_m(&depth_m) == 0;
 
 	payload[0] = PROTOCOL_VERSION;
 	/* Reported released only once thrust commands are obeyed */
@@ -121,24 +127,24 @@ int main(void)
 
 	protocol_init(usb_device);
 	/* Keeps running, so the host still gets state frames: they say killed */
-	if (setup_killswitch() < 0) {
+	if (killswitch_init() < 0) {
 		LOG_ERR("No kill switch: staying killed");
 	}
-	if (setup_thrusters() < 0) {
+	if (thruster_init() < 0) {
 		LOG_ERR("No thrusters");
 	}
-	if (setup_servos() < 0) {
+	if (servo_init() < 0) {
 		LOG_ERR("No servos");
 	}
-	if (setup_pressure() < 0) {
+	if (pressure_init() < 0) {
 		LOG_ERR("No pressure sensor");
 	}
-	if (setup_watchdog() < 0) {
+	if (watchdog_init() < 0) {
 		LOG_ERR("No watchdog");
 	}
 
 	/* Neutral until the kill switch is released and the ESCs have initialized */
-	stop_thrusters();
+	thruster_stop();
 
 	struct frame frame;
 	struct thrust_state thrust = {0};
@@ -151,7 +157,7 @@ int main(void)
 	while (true) {
 		now = k_uptime_get();
 
-		feed_watchdog();
+		watchdog_feed();
 
 		const bool was_released = released;
 
@@ -162,13 +168,13 @@ int main(void)
 		} else if (!released && was_released) {
 			thrust.running = false;
 			thrust.commanded = false;
-			stop_thrusters();
+			thruster_stop();
 		}
 		if (released && !thrust.running && now >= esc_ready_at) {
 			thrust.running = true;
 			thrust.commanded = false;
 			/* The surface for this run, unless released underwater */
-			rezero_near_surface(REZERO_LIMIT_M);
+			pressure_rezero_near_surface(REZERO_LIMIT_M);
 		}
 
 		while (protocol_receive(&frame) == 0) {
@@ -179,7 +185,7 @@ int main(void)
 		/* driving on the last command */
 		if (thrust.running && thrust.commanded &&
 		    now - thrust.last_command > COMMAND_TIMEOUT_MS) {
-			stop_thrusters();
+			thruster_stop();
 			thrust.commanded = false;
 			thrust.command_timeouts++;
 		}
@@ -187,7 +193,7 @@ int main(void)
 		if (now >= next_state) {
 			next_state = now + STATE_PERIOD_MS;
 			if (!thrust.running) {
-				stop_thrusters();
+				thruster_stop();
 			}
 
 			send_state(&thrust, now);

@@ -11,12 +11,12 @@ enum servo_type {
 #endif
 };
 
-int setup_servos(void);
-int set_pulse(enum servo_type type, int pulse_us);
-void drop(int idx, int value);
-void shoot(int idx, int value);
+int servo_init(void);
+int servo_set_pulse(enum servo_type type, int pulse_us);
+void servo_drop(int idx, int value);
+void servo_shoot(int idx, int value);
 #ifdef HAVE_GRABBER
-void grab(int idx, int value);
+void servo_grab(int idx, int value);
 #endif
 
 #endif /* _MARITIME_SERVO_H */

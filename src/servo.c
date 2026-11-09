@@ -37,7 +37,7 @@ static const uint32_t grabber_max_pulse = DT_PROP(DT_NODELABEL(grabber_servo), m
  * max pulse = max angle = right hole
  */
 
-int setup_servos(void)
+int servo_init(void)
 {
 	/* Set all of the servos to go to the middle (neutral) position */
 	if (!device_is_ready(dropper_servo.dev)) {
@@ -92,7 +92,7 @@ static uint32_t clamp_pulse(int pulse_us, uint32_t min_ns, uint32_t max_ns)
 	return (uint32_t)CLAMP(pulse_us, min_us, max_us) * NSEC_PER_USEC;
 }
 
-int set_pulse(enum servo_type type, int pulse_us)
+int servo_set_pulse(enum servo_type type, int pulse_us)
 {
 	const struct pwm_dt_spec *servo;
 	uint32_t pulse_ns;
@@ -125,7 +125,7 @@ int set_pulse(enum servo_type type, int pulse_us)
 	return ret;
 }
 
-void drop(int idx, int value)
+void servo_drop(int idx, int value)
 {
 	LOG_DBG("Drop for %i %i", idx, value);
 
@@ -151,7 +151,7 @@ void drop(int idx, int value)
 }
 
 #if HAVE_GRABBER
-void grab(float value)
+void servo_grab(float value)
 {
 	/*
 	 * value = the fraction of closed you grabber to be (0 to 1).
@@ -171,7 +171,7 @@ void grab(float value)
 }
 #endif
 
-void shoot(int idx, int value)
+void servo_shoot(int idx, int value)
 {
 	LOG_DBG("Set torpedo %i to %i", idx, value);
 	int ret = 0;

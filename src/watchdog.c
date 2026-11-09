@@ -13,7 +13,7 @@ static const struct device *wdt = DEVICE_DT_GET(DT_ALIAS(watchdog0));
 
 static int watchdog_channel = -1;
 
-int setup_watchdog(void)
+int watchdog_init(void)
 {
 	if (!device_is_ready(wdt)) {
 		LOG_ERR("Watchdog device not ready");
@@ -45,7 +45,7 @@ int setup_watchdog(void)
 	return 0;
 }
 
-void feed_watchdog(void)
+void watchdog_feed(void)
 {
 	if (watchdog_channel >= 0) {
 		wdt_feed(wdt, watchdog_channel);
