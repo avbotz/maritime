@@ -1,21 +1,14 @@
-/* SPDX-License-Identifier: MIT */
-
 #include "killswitch.h"
 #include "pressure.h"
+#include "protocol.h"
 #include "thruster.h"
 #include "servo.h"
-#include "util.h"
+#include "watchdog.h"
 
 #include <zephyr/kernel.h>
-#include <zephyr/sys/printk.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/drivers/uart.h>
-#include <zephyr/drivers/watchdog.h>
+#include <zephyr/sys/byteorder.h>
 #include <zephyr/logging/log.h>
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
 #include <stdbool.h>
 
 #ifdef CONFIG_BOARD_RPI_PICO
@@ -24,98 +17,18 @@
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
-BUILD_ASSERT(DT_NODE_HAS_COMPAT(DT_CHOSEN(zephyr_console), zephyr_cdc_acm_uart),
-	     "Console device is not ACM CDC UART device");
-
-#define PROTOCOL_VERSION    2
-/* While running, every thruster goes neutral if no thrust command arrives for this long [ms] */
-#define COMMAND_TIMEOUT_MS  500
-/* Time between kill switch powering up ESCs and thrust commands being sent [ms] */
-#define ESC_INIT_MS         750
-#define KILL_DEBOUNCE_MS    75
-/* Kill switch, depth and heartbeat lines [ms] */
-#define STATE_PERIOD_MS     200
-/* The hardware watchdog timeout [ms] */
-#define WATCHDOG_TIMEOUT_MS 1000
+/* Thrusters go neutral if no thrust command arrives for this long [ms] */
+static const int64_t COMMAND_TIMEOUT_MS = 500;
+/* Time between kill switch powering up ESCs and thrust commands being sent [ms].
+ * The ESCs must receive a 1500 us pulse for this long so they can initialize properly.
+ */
+static const int64_t ESC_INIT_MS = 750;
+/* Time between state frames to the host [ms] */
+static const int64_t STATE_PERIOD_MS = 200;
 /* Depth is re-zeroed at a kill switch release only within this of the surface [m] */
-#define REZERO_LIMIT_M      0.5f
+static const float REZERO_LIMIT_M = 0.5f;
 
-static const struct device *usb_device = DEVICE_DT_GET(DT_CHOSEN(zephyr_console));
-
-#define MSG_SIZE 256
-K_MSGQ_DEFINE(uart_msgq, MSG_SIZE, 10, 1);
-
-static char rx_buf[MSG_SIZE];
-static size_t rx_pos;
-/* The line overran rx_buf: the rest of it is dropped up to its newline */
-static bool rx_overflow;
-
-/* the pico does not support floating point formatting in printk, so we need to */
-/* convert to integer parts */
-static void format_float(float value, char *buf, size_t size)
-{
-	int whole = abs((int)value);
-	int frac = abs((int)((value - (int)value) * 1000));
-
-	snprintf(buf, size, "%s%d.%03d", value < 0 ? "-" : "", whole, frac);
-}
-
-static void uart_rx_handler(const struct device *dev, void *user_data)
-{
-	ARG_UNUSED(user_data);
-
-	uint8_t c;
-
-	uart_irq_update(dev);
-	while (uart_irq_is_pending(dev)) {
-		if (uart_irq_rx_ready(dev)) {
-			if (uart_fifo_read(dev, &c, 1) != 1) {
-				uart_irq_update(dev);
-				continue;
-			}
-
-			if (c == '\n' || c == '\r') {
-				if (rx_pos > 0 && !rx_overflow) {
-					rx_buf[rx_pos] = '\0';
-					k_msgq_put(&uart_msgq, rx_buf, K_NO_WAIT);
-				}
-				rx_pos = 0;
-				rx_overflow = false;
-			} else if (rx_pos < MSG_SIZE - 1) {
-				rx_buf[rx_pos++] = (char)c;
-			} else {
-				rx_overflow = true;
-			}
-		}
-		uart_irq_update(dev);
-	}
-}
-
-static int setup_watchdog(const struct device *wdt)
-{
-	if (wdt == NULL || !device_is_ready(wdt)) {
-		LOG_ERR("Watchdog device not ready");
-		return -ENODEV;
-	}
-	const struct wdt_timeout_cfg cfg = {
-		.window = {.min = 0, .max = WATCHDOG_TIMEOUT_MS},
-		.callback = NULL,
-		.flags = WDT_FLAG_RESET_SOC,
-	};
-	int channel = wdt_install_timeout(wdt, &cfg);
-
-	if (channel < 0) {
-		LOG_ERR("Watchdog install failed: %d", channel);
-		return channel;
-	}
-	int ret = wdt_setup(wdt, WDT_OPT_PAUSE_HALTED_BY_DBG);
-
-	if (ret < 0) {
-		LOG_ERR("Watchdog setup failed: %d", ret);
-		return ret;
-	}
-	return channel;
-}
+static const struct device *usb_device = DEVICE_DT_GET(DT_NODELABEL(cdc_acm_uart0));
 
 /* What the thrusters may do */
 struct thrust_state {
@@ -128,98 +41,75 @@ struct thrust_state {
 	uint32_t command_timeouts;
 };
 
-/* Parses and sends an m, p or a command; false if it is malformed */
-static bool send_thrust_command(char c, char **save_ptr)
+static void handle_frame(const struct frame *frame, struct thrust_state *thrust, int64_t now)
 {
-	float value;
+	const uint8_t *payload = frame->payload;
 
-	if (c == 'm') {
+	switch (frame->type) {
+	case MSG_THRUSTERS: {
+		if (!thrust->running) {
+			break;
+		}
 		float thrusts[NUM_THRUSTERS];
 
 		for (int i = 0; i < NUM_THRUSTERS; i++) {
-			if (!parse_float_arg(strtok_r(NULL, " ", save_ptr), &thrusts[i])) {
-				return false;
-			}
+			thrusts[i] = protocol_get_f32(&payload[4 * i]);
 		}
 		send_thrusts(thrusts);
-	} else if (c == 'p') {
-		char *thruster_token = strtok_r(NULL, " ", save_ptr);
-		char *thrust_token = strtok_r(NULL, " ", save_ptr);
-		int thruster;
-
-		if (!parse_int_arg(thruster_token, &thruster) ||
-		    !parse_float_arg(thrust_token, &value)) {
-			return false;
-		}
-		send_thrust(thruster, value);
-
-		LOG_DBG("Setting thruster power: p %d %d\n", thruster, (int)(value * 1000));
-	} else {
-		if (!parse_float_arg(strtok_r(NULL, " ", save_ptr), &value)) {
-			return false;
-		}
-		send_all_thrusts(value);
+		thrust->commanded = true;
+		thrust->last_command = now;
+		break;
 	}
-	return true;
-}
-
-static void handle_command(char *msg, struct thrust_state *thrust, int64_t now)
-{
-	char *save_ptr;
-	char *token = strtok_r(msg, " ", &save_ptr);
-
-	if (!token) {
-		return;
-	}
-	char c = token[0];
-
-	if (c == 'm' || c == 'p' || c == 'a') {
-		if (thrust->running && send_thrust_command(c, &save_ptr)) {
-			thrust->commanded = true;
-			thrust->last_command = now;
-		}
-	} else if (c == 's') {
-		/* Usage: s <type> <pulse_us> */
-		/* type: g (grabber), t (shooter), d (dropper) */
-		/* pulse_us: microseconds, clamped to the servo's range from the overlay */
-		char *type_token = strtok_r(NULL, " ", &save_ptr);
-		char *pulse_token = strtok_r(NULL, " ", &save_ptr);
-		int pulse_us;
-
-		if (!type_token || !parse_int_arg(pulse_token, &pulse_us)) {
-			return;
-		}
-
-		switch (type_token[0]) {
-		case 'g':
-			set_pulse(SERVO_GRABBER, pulse_us);
+	case MSG_TORPEDO:
+	case MSG_DROPPER:
+		if (payload[0] > 1 || payload[1] > 1) {
 			break;
-		case 't':
-			set_pulse(SERVO_SHOOTER, pulse_us);
-			break;
-		case 'd':
+		}
+		(frame->type == MSG_TORPEDO ? shoot : drop)(payload[0], payload[1]);
+		break;
+	case MSG_SERVO: {
+		/* Clamped to the servo's range from the overlay */
+		const int pulse_us = sys_get_le16(&payload[1]);
+
+		switch (payload[0]) {
+		case SERVO_ID_DROPPER:
 			set_pulse(SERVO_DROPPER, pulse_us);
 			break;
+		case SERVO_ID_GRABBER:
+			set_pulse(SERVO_GRABBER, pulse_us);
+			break;
+		case SERVO_ID_SHOOTER:
+			set_pulse(SERVO_SHOOTER, pulse_us);
+			break;
 		}
-	} else if (c == 't' || c == 'd') {
-		char *selector_token = strtok_r(NULL, " ", &save_ptr);
-		char *state_token = strtok_r(NULL, " ", &save_ptr);
-
-		if (!selector_token || !state_token) {
-			return;
-		}
-
-		int selector = selector_token[0] == '1';
-		int state = state_token[0] == '1';
-
-		(c == 't' ? shoot : drop)(selector, state);
+		break;
 	}
 #ifdef CONFIG_BOARD_RPI_PICO
-	else if (c == 'r') {
-		stop_thrusters();
-		reset_usb_boot(0, 0);
-	}
+	case MSG_BOOTLOADER:
+		if (sys_get_le32(payload) == BOOTLOADER_MAGIC) {
+			stop_thrusters();
+			reset_usb_boot(0, 0);
+		}
+		break;
 #endif
+	}
+}
+
+static void send_state(const struct thrust_state *thrust, int64_t now)
+{
+	uint8_t payload[STATE_SIZE];
+	/* Left 0 and flagged invalid, rather than made up, if the sensor cannot be read */
+	float depth_m = 0.0f;
+	const bool depth_valid = get_depth_meters(&depth_m) == 0;
+
+	payload[0] = PROTOCOL_VERSION;
+	/* Reported released only once thrust commands are obeyed */
+	payload[1] = (thrust->running ? 0 : STATE_KILLED) | (depth_valid ? STATE_DEPTH_VALID : 0);
+	protocol_put_f32(depth_m, &payload[2]);
+	sys_put_le32((uint32_t)now, &payload[6]);
+	sys_put_le32(thrust->command_timeouts, &payload[10]);
+	sys_put_le32(protocol_rx_errors(), &payload[14]);
+	protocol_send(MSG_STATE, payload, sizeof(payload));
 }
 
 int main(void)
@@ -229,61 +119,50 @@ int main(void)
 		return -1;
 	}
 
-	uart_irq_callback_user_data_set(usb_device, uart_rx_handler, NULL);
-	uart_irq_rx_enable(usb_device);
-	setup_killswitch();
-	setup_thrusters();
-	setup_servos();
-	setup_pressure();
+	protocol_init(usb_device);
+	/* Keeps running, so the host still gets state frames: they say killed */
+	if (setup_killswitch() < 0) {
+		LOG_ERR("No kill switch: staying killed");
+	}
+	if (setup_thrusters() < 0) {
+		LOG_ERR("No thrusters");
+	}
+	if (setup_servos() < 0) {
+		LOG_ERR("No servos");
+	}
+	if (setup_pressure() < 0) {
+		LOG_ERR("No pressure sensor");
+	}
+	if (setup_watchdog() < 0) {
+		LOG_ERR("No watchdog");
+	}
 
 	/* Neutral until the kill switch is released and the ESCs have initialized */
 	stop_thrusters();
 
-	const struct device *wdt = DEVICE_DT_GET_OR_NULL(DT_ALIAS(watchdog0));
-	const int wdt_channel = setup_watchdog(wdt);
-
-	char msg[MSG_SIZE];
+	struct frame frame;
 	struct thrust_state thrust = {0};
-	/* The kill switch as read, since when, and as debounced. Starts killed, whatever it */
-	/* reads, and a release counts only after the switch has read killed since boot: a */
-	/* board that resets mid-run (brownout, watchdog) stays killed until someone cycles */
-	/* the switch, rather than driving again on its own. */
-	int64_t now = k_uptime_get();
-	bool raw_alive = alive();
-	int64_t raw_since = now;
+	/* The kill switch as debounced (killswitch.h): starts killed until it is cycled */
 	bool released = false;
-	bool seen_killed = false;
 	int64_t esc_ready_at = 0;
+	int64_t now = k_uptime_get();
 	int64_t next_state = now;
 
 	while (true) {
 		now = k_uptime_get();
-		if (wdt_channel >= 0) {
-			wdt_feed(wdt, wdt_channel);
-		}
 
-		/* Kill switch: a new reading counts once it has held for KILL_DEBOUNCE_MS */
-		bool reading = alive();
+		feed_watchdog();
 
-		if (reading != raw_alive) {
-			raw_alive = reading;
-			raw_since = now;
-		}
-		const bool settled = now - raw_since >= KILL_DEBOUNCE_MS;
+		const bool was_released = released;
 
-		if (settled && !raw_alive) {
-			seen_killed = true;
-		}
-		if (settled && raw_alive != released && seen_killed) {
-			released = raw_alive;
-			if (released) {
-				/* The switch powers the ESCs up: they need neutral first */
-				esc_ready_at = now + ESC_INIT_MS;
-			} else {
-				thrust.running = false;
-				thrust.commanded = false;
-				stop_thrusters();
-			}
+		released = killswitch_update(now) == KILLSWITCH_RELEASED;
+		if (released && !was_released) {
+			/* The switch powers the ESCs up: they need neutral first */
+			esc_ready_at = now + ESC_INIT_MS;
+		} else if (!released && was_released) {
+			thrust.running = false;
+			thrust.commanded = false;
+			stop_thrusters();
 		}
 		if (released && !thrust.running && now >= esc_ready_at) {
 			thrust.running = true;
@@ -292,8 +171,8 @@ int main(void)
 			rezero_near_surface(REZERO_LIMIT_M);
 		}
 
-		while (k_msgq_get(&uart_msgq, msg, K_NO_WAIT) == 0) {
-			handle_command(msg, &thrust, now);
+		while (protocol_receive(&frame) == 0) {
+			handle_frame(&frame, &thrust, now);
 		}
 
 		/* The host stopped commanding (crashed, unplugged): stop rather than keep */
@@ -311,21 +190,7 @@ int main(void)
 				stop_thrusters();
 			}
 
-			/* Reported released only once thrust commands are obeyed */
-			printk(thrust.running ? "x 0\n" : "x 1\n");
-
-			/* No line rather than a made-up depth if the sensor cannot be read */
-			float depth_m;
-
-			if (get_depth_meters(&depth_m) == 0) {
-				char depth_s[24];
-
-				format_float(depth_m, depth_s, sizeof(depth_s));
-				printk("d %s\n", depth_s);
-			}
-
-			printk("h %d %u %u\n", PROTOCOL_VERSION, (uint32_t)now,
-			       thrust.command_timeouts);
+			send_state(&thrust, now);
 		}
 
 		/* Yield so lower-priority threads (log thread) get CPU time; without */

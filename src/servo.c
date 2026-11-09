@@ -1,15 +1,9 @@
-/* SPDX-License-Identifier: MIT */
-
-/* Servos control the ball dropper, torpedo shooter, grabber */
 #include "servo.h"
 
-#include <zephyr/kernel.h>
-#include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/pwm.h>
 #include <zephyr/logging/log.h>
-#include <stdalign.h>
 
 #include <errno.h>
 #include <stdint.h>
@@ -17,7 +11,6 @@
 LOG_MODULE_REGISTER(servos, LOG_LEVEL_DBG);
 
 /* The grabber is built only when the overlay has its node */
-#define HAVE_GRABBER DT_NODE_EXISTS(DT_NODELABEL(grabber_servo))
 
 static const struct pwm_dt_spec dropper_servo = PWM_DT_SPEC_GET(DT_NODELABEL(dropper_servo));
 static const struct pwm_dt_spec shooter_servo = PWM_DT_SPEC_GET(DT_NODELABEL(shooter_servo));
@@ -44,36 +37,47 @@ static const uint32_t grabber_max_pulse = DT_PROP(DT_NODELABEL(grabber_servo), m
  * max pulse = max angle = right hole
  */
 
-void setup_servos(void)
+int setup_servos(void)
 {
 	/* Set all of the servos to go to the middle (neutral) position */
 	if (!device_is_ready(dropper_servo.dev)) {
 		LOG_ERR("Dropper device is not ready");
+		return -ENODEV;
 	}
 
 	if (!device_is_ready(shooter_servo.dev)) {
 		LOG_ERR("Shooter device is not ready");
-	}
-
-	int ret = pwm_set_pulse_dt(&dropper_servo, dropper_mid_pulse);
-
-	if (ret < 0) {
-		LOG_ERR("Failed to set pwm pulse for dropper servo, error code %i", ret);
-	}
-	ret = pwm_set_pulse_dt(&shooter_servo, shooter_min_pulse);
-	if (ret < 0) {
-		LOG_ERR("Failed to set pwm pulse for shooter servo, error code %i", ret);
+		return -ENODEV;
 	}
 
 #if HAVE_GRABBER
 	if (!device_is_ready(grabber_servo.dev)) {
 		LOG_ERR("Grabber device is not ready");
+		return -ENODEV;
 	}
+#endif
+
+	int ret = pwm_set_pulse_dt(&dropper_servo, dropper_mid_pulse);
+
+	if (ret < 0) {
+		LOG_ERR("Failed to set pwm pulse for dropper servo, error code %i", ret);
+		return ret;
+	}
+	ret = pwm_set_pulse_dt(&shooter_servo, shooter_min_pulse);
+	if (ret < 0) {
+		LOG_ERR("Failed to set pwm pulse for shooter servo, error code %i", ret);
+		return ret;
+	}
+
+#if HAVE_GRABBER
 	ret = pwm_set_pulse_dt(&grabber_servo, grabber_min_pulse);
 	if (ret < 0) {
 		LOG_ERR("Failed to set pwm pulse for grabber servo, error code %i", ret);
+		return ret;
 	}
 #endif
+
+	return 0;
 }
 
 /*

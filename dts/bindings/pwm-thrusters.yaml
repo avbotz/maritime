@@ -1,6 +1,4 @@
-description: |
-  PWM-driven ESC thrusters, one child node per thruster. thruster.c refers to the
-  children by node label (thruster0 to thruster7).
+description: PWM-driven ESC thrusters with one child node per thruster.
 
 compatible: "pwm-thrusters"
 

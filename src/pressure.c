@@ -1,11 +1,8 @@
-/* SPDX-License-Identifier: MIT */
+#include "pressure.h"
 
 #include <zephyr/device.h>
 #include <zephyr/drivers/adc.h>
-#include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
-
-#include "pressure.h"
 
 #include <errno.h>
 #include <math.h>
@@ -34,6 +31,30 @@ static bool have_initial_sample;
 
 /* ADC counts per metre of water, from a linear fit of readings against measured depth */
 #define COUNTS_PER_METER 365.0f
+
+int setup_pressure(void)
+{
+	if (!adc_is_ready_dt(&adc_channel)) {
+		LOG_ERR("ADC controller %s not ready", adc_channel.dev->name);
+		return -ENODEV;
+	}
+
+	int ret = adc_channel_setup_dt(&adc_channel);
+
+	if (ret != 0) {
+		LOG_ERR("Failed to setup ADC channel: %d", ret);
+		return ret;
+	}
+
+	ret = adc_sequence_init_dt(&adc_channel, &sequence);
+
+	if (ret != 0) {
+		LOG_ERR("Failed to init ADC sequence: %d", ret);
+		return ret;
+	}
+
+	return reset_reference();
+}
 
 int get_raw_pressure(void)
 {
@@ -67,30 +88,6 @@ static int get_raw_averaged_pressure(void)
 	}
 
 	return good == PRESSURE_SAMPLES ? sum / good : -EIO;
-}
-
-int setup_pressure(void)
-{
-	if (!adc_is_ready_dt(&adc_channel)) {
-		LOG_ERR("ADC controller %s not ready", adc_channel.dev->name);
-		return -ENODEV;
-	}
-
-	int ret = adc_channel_setup_dt(&adc_channel);
-
-	if (ret != 0) {
-		LOG_ERR("Failed to setup ADC channel: %d", ret);
-		return ret;
-	}
-
-	ret = adc_sequence_init_dt(&adc_channel, &sequence);
-
-	if (ret != 0) {
-		LOG_ERR("Failed to init ADC sequence: %d", ret);
-		return ret;
-	}
-
-	return reset_reference();
 }
 
 static float raw_to_depth(int raw)

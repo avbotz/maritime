@@ -1,8 +1,6 @@
 #ifndef _MARITIME_PRESSURE_H
 #define _MARITIME_PRESSURE_H
 
-#include <zephyr/kernel.h>
-
 int setup_pressure(void);
 /* Takes the current reading as the surface (depth 0) */
 int reset_reference(void);
