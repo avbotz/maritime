@@ -4,7 +4,6 @@
 #include <zephyr/drivers/adc.h>
 #include <zephyr/logging/log.h>
 
-#include <errno.h>
 #include <math.h>
 #include <stdbool.h>
 
@@ -56,7 +55,7 @@ int pressure_init(void)
 	return pressure_reset_reference();
 }
 
-int pressure_get_raw(void)
+static int pressure_get_raw(void)
 {
 	int ret = adc_read_dt(&adc_channel, &sequence);
 

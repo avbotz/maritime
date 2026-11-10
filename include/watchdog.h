@@ -1,7 +1,7 @@
-#ifndef _MARITIME_WATCHDOG_H
-#define _MARITIME_WATCHDOG_H
+#ifndef MARITIME_WATCHDOG_H_
+#define MARITIME_WATCHDOG_H_
 
 int watchdog_init(void);
 void watchdog_feed(void);
 
-#endif /* _MARITIME_WATCHDOG_H */
+#endif /* MARITIME_WATCHDOG_H_ */

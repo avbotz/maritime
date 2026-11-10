@@ -1,5 +1,5 @@
-#ifndef _MARITIME_PRESSURE_H
-#define _MARITIME_PRESSURE_H
+#ifndef MARITIME_PRESSURE_H_
+#define MARITIME_PRESSURE_H_
 
 int pressure_init(void);
 /* Takes the current reading as the surface (depth 0) */
@@ -10,8 +10,7 @@ int pressure_reset_reference(void);
  * release underwater does not move the surface. -ERANGE if it is not.
  */
 int pressure_rezero_near_surface(float limit_m);
-int pressure_get_raw(void);
 /* Depth below the surface reading [m, positive down]; -EIO if the sensor cannot be read */
 int pressure_get_depth_m(float *depth_m);
 
-#endif
+#endif /* MARITIME_PRESSURE_H_ */

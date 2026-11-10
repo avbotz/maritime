@@ -5,7 +5,6 @@
 #include <zephyr/drivers/pwm.h>
 #include <zephyr/logging/log.h>
 
-#include <errno.h>
 #include <stdint.h>
 
 LOG_MODULE_REGISTER(servos, LOG_LEVEL_DBG);
@@ -27,15 +26,9 @@ static const uint32_t shooter_mid_pulse = DT_PROP(DT_NODELABEL(shooter_servo), m
 static const uint32_t shooter_max_pulse = DT_PROP(DT_NODELABEL(shooter_servo), max_pulse);
 
 #if HAVE_GRABBER
-/* Grabber only uses only part of the servo's range, from 37% to 66% of servo's range */
 static const uint32_t grabber_min_pulse = DT_PROP(DT_NODELABEL(grabber_servo), min_pulse);
 static const uint32_t grabber_max_pulse = DT_PROP(DT_NODELABEL(grabber_servo), max_pulse);
 #endif
-
-/*
- * min pulse = min angle = left hole
- * max pulse = max angle = right hole
- */
 
 int servo_init(void)
 {

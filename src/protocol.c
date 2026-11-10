@@ -5,7 +5,6 @@
 #include <zephyr/drivers/uart.h>
 #include <zephyr/sys/atomic.h>
 
-#include <errno.h>
 #include <stdbool.h>
 
 /* type */

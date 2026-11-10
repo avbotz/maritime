@@ -10,17 +10,16 @@
 
 LOG_MODULE_REGISTER(thrusters, LOG_LEVEL_DBG);
 
-static const struct pwm_dt_spec thruster_devices[NUM_THRUSTERS] = {
-	PWM_DT_SPEC_GET(DT_NODELABEL(thruster0)), PWM_DT_SPEC_GET(DT_NODELABEL(thruster1)),
-	PWM_DT_SPEC_GET(DT_NODELABEL(thruster2)), PWM_DT_SPEC_GET(DT_NODELABEL(thruster3)),
-	PWM_DT_SPEC_GET(DT_NODELABEL(thruster4)), PWM_DT_SPEC_GET(DT_NODELABEL(thruster5)),
-	PWM_DT_SPEC_GET(DT_NODELABEL(thruster6)), PWM_DT_SPEC_GET(DT_NODELABEL(thruster7)),
-};
+/* Not DT_FOREACH_CHILD_SEP: clang-format turns its (,) into (, ), which checkpatch rejects */
+#define THRUSTER_PWM_SPEC(node_id) PWM_DT_SPEC_GET(node_id),
 
-static const uint32_t THRUSTER_MIN_PULSE = 1100;
-static const uint32_t THRUSTER_MAX_PULSE = 1900;
-/* Maximum of |thrust|. Corresponds to 1260-1740 us to the Basic ESCs. */
-static const float MAX_POWER = 0.6f;
+static const struct pwm_dt_spec thruster_devices[] = {
+	DT_FOREACH_CHILD(DT_PATH(thrusters), THRUSTER_PWM_SPEC)};
+BUILD_ASSERT(ARRAY_SIZE(thruster_devices) == NUM_THRUSTERS);
+
+static const uint32_t THRUSTER_MIN_PULSE = DT_PROP(DT_PATH(thrusters), min_pulse);
+static const uint32_t THRUSTER_MAX_PULSE = DT_PROP(DT_PATH(thrusters), max_pulse);
+static const float MAX_POWER = DT_PROP(DT_PATH(thrusters), max_power) / 100.0f;
 
 int thruster_init(void)
 {
@@ -68,9 +67,9 @@ void thruster_send(int thruster, float thrust)
 		(uint32_t)((thrust + 1.0f) * (THRUSTER_MAX_PULSE - THRUSTER_MIN_PULSE) / 2 +
 			   THRUSTER_MIN_PULSE);
 
-	int ret = pwm_set_pulse_dt(&thruster_devices[thruster], PWM_USEC(pulse_width));
+	int ret = pwm_set_pulse_dt(&thruster_devices[thruster], pulse_width);
 
 	if (ret < 0) {
-		LOG_DBG("Failed to set pulse for thruster %d, error code %i", thruster, ret);
+		LOG_ERR("Failed to set pulse for thruster %d, error code %i", thruster, ret);
 	}
 }

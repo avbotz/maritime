@@ -74,6 +74,12 @@ static void handle_frame(const struct frame *frame, struct thrust_state *thrust,
 
 		servo_drop(payload[0], payload[1]);
 		break;
+#if HAVE_GRABBER
+	case MSG_GRABBER:
+		grab(protocol_get_f32(&payload[0]));
+
+		break;
+#endif
 	case MSG_SERVO: {
 		/* Clamped to the servo's range from the overlay */
 		const int pulse_us = sys_get_le16(&payload[1]);
@@ -82,16 +88,18 @@ static void handle_frame(const struct frame *frame, struct thrust_state *thrust,
 		case SERVO_ID_DROPPER:
 			servo_set_pulse(SERVO_DROPPER, pulse_us);
 			break;
+#if HAVE_GRABBER
 		case SERVO_ID_GRABBER:
 			servo_set_pulse(SERVO_GRABBER, pulse_us);
 			break;
+#endif
 		case SERVO_ID_SHOOTER:
 			servo_set_pulse(SERVO_SHOOTER, pulse_us);
 			break;
 		}
 		break;
 	}
-#ifdef CONFIG_BOARD_RPI_PICO
+#ifdef CONFIG_SOC_FAMILY_RPI_PICO
 	case MSG_BOOTLOADER:
 		if (sys_get_le32(payload) == BOOTLOADER_MAGIC) {
 			thruster_stop();
@@ -129,7 +137,7 @@ int main(void)
 	protocol_init(usb_device);
 	/* Keeps running, so the host still gets state frames: they say killed */
 	if (killswitch_init() < 0) {
-		LOG_ERR("No kill switch: staying killed");
+		LOG_ERR("No kill switch");
 	}
 	if (thruster_init() < 0) {
 		LOG_ERR("No thrusters");

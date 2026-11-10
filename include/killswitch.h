@@ -1,5 +1,5 @@
-#ifndef _MARITIME_KILLSWITCH_H
-#define _MARITIME_KILLSWITCH_H
+#ifndef MARITIME_KILLSWITCH_H_
+#define MARITIME_KILLSWITCH_H_
 
 #include <stdint.h>
 
@@ -16,4 +16,4 @@ int killswitch_init(void);
 /* Should be called around every ms from a single thread. */
 enum killswitch_state killswitch_update(int64_t now);
 
-#endif /* _MARITIME_KILLSWITCH_H */
+#endif /* MARITIME_KILLSWITCH_H_ */

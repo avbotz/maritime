@@ -1,5 +1,6 @@
 #include "killswitch.h"
 
+#include <zephyr/devicetree.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/logging/log.h>
 
@@ -7,12 +8,11 @@
 
 LOG_MODULE_REGISTER(killswitch, LOG_LEVEL_DBG);
 
-/* Killed reading counts after it has held this long [ms] */
-static const int64_t KILLSWITCH_KILL_MS = 10;
-/* Released reading counts after it has held this long [ms] */
-static const int64_t KILLSWITCH_RELEASE_MS = 50;
-
 static const struct gpio_dt_spec killswitch = GPIO_DT_SPEC_GET(DT_NODELABEL(killswitch), gpios);
+/* Killed reading counts after it has held this long [ms] */
+static const int64_t KILLSWITCH_KILL_MS = DT_PROP(DT_NODELABEL(killswitch), press_debounce_ms);
+/* Released reading counts after it has held this long [ms] */
+static const int64_t KILLSWITCH_RELEASE_MS = DT_PROP(DT_NODELABEL(killswitch), release_debounce_ms);
 
 static struct {
 	enum killswitch_state state;

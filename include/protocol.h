@@ -1,5 +1,5 @@
-#ifndef _MARITIME_PROTOCOL_H
-#define _MARITIME_PROTOCOL_H
+#ifndef MARITIME_PROTOCOL_H_
+#define MARITIME_PROTOCOL_H_
 
 /*
  * The binary protocol to the host (https://sw.avbotz.com/maritime/protocol/ has the full
@@ -26,8 +26,9 @@
 #define MSG_THRUSTERS  0x01 /* f32 thrust[8], each between -1 and 1 */
 #define MSG_TORPEDO    0x02 /* u8 id (0, 1), u8 open (0, 1) */
 #define MSG_DROPPER    0x03 /* u8 id (0, 1), u8 open (0, 1) */
-#define MSG_SERVO      0x04 /* u8 servo (SERVO_ID_*), u16 pulse_us */
-#define MSG_BOOTLOADER 0x05 /* u32 BOOTLOADER_MAGIC */
+#define MSG_GRABBER    0x04
+#define MSG_SERVO      0x05 /* u8 servo (SERVO_ID_*), u16 pulse_us */
+#define MSG_BOOTLOADER 0x06 /* u32 BOOTLOADER_MAGIC */
 /* Board to host */
 #define MSG_STATE      0x81 /* u8 protocol, u8 flags, f32 depth_m, u32 uptime_ms, */
 			    /* u32 command_timeouts, u32 rx_errors */
@@ -84,4 +85,4 @@ static inline void protocol_put_f32(float value, uint8_t *dst)
 	sys_put_le32(bits, dst);
 }
 
-#endif /* _MARITIME_PROTOCOL_H */
+#endif /* MARITIME_PROTOCOL_H_ */

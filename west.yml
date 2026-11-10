@@ -5,7 +5,7 @@ manifest:
   projects:
     - name: zephyr
       remote: zephyrproject-rtos
-      revision: v4.4.0
+      revision: v4.5.0
       # Only the modules an RP2040 build uses, rather than every vendor's HAL
       import:
         name-allowlist:
