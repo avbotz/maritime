@@ -10,7 +10,7 @@ LOG_MODULE_REGISTER(killswitch, LOG_LEVEL_DBG);
 
 static const struct gpio_dt_spec killswitch = GPIO_DT_SPEC_GET(DT_NODELABEL(killswitch), gpios);
 /* Killed reading counts after it has held this long [ms] */
-static const int64_t KILLSWITCH_KILL_MS = DT_PROP(DT_NODELABEL(killswitch), press_debounce_ms);
+static const int64_t KILLSWITCH_KILL_MS = DT_PROP(DT_NODELABEL(killswitch), kill_debounce_ms);
 /* Released reading counts after it has held this long [ms] */
 static const int64_t KILLSWITCH_RELEASE_MS = DT_PROP(DT_NODELABEL(killswitch), release_debounce_ms);
 
@@ -57,6 +57,10 @@ enum killswitch_state killswitch_update(int64_t now)
 		debounce.state = KILLSWITCH_KILLED;
 	} else if (!debounce.killed && held >= KILLSWITCH_RELEASE_MS &&
 		   debounce.state == KILLSWITCH_KILLED) {
+		/*
+		 * Require that killswitch is killed before it can be released, to avoid accidental
+		 * release on power-up
+		 */
 		debounce.state = KILLSWITCH_RELEASED;
 	}
 

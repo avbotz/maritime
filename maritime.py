@@ -23,8 +23,9 @@ PROTOCOL_VERSION = 3
 MSG_THRUSTERS = 0x01
 MSG_TORPEDO = 0x02
 MSG_DROPPER = 0x03
-MSG_SERVO = 0x04
-MSG_BOOTLOADER = 0x05
+MSG_GRABBER = 0x04
+MSG_SERVO = 0x05
+MSG_BOOTLOADER = 0x06
 MSG_STATE = 0x81
 STATE = struct.Struct("<BBfIII")
 STATE_KILLED = 1 << 0
@@ -412,6 +413,17 @@ class Shell(cmd.Cmd):
             raise ValueError("usage: servo <dropper|grabber|shooter> <pulse_us>")
         self.board.send(MSG_SERVO, struct.pack("<BH", SERVOS[args[0]], int(args[1])))
 
+    def do_grabber(self, arg):
+        """grabber <open|close|0-1>: open, close, or how closed (0 open, 1 closed)"""
+        positions = {"open": 0.0, "close": 1.0}
+        try:
+            closed = positions[arg] if arg in positions else float(arg)
+        except ValueError:
+            closed = math.nan
+        if not 0 <= closed <= 1:
+            raise ValueError("usage: grabber <open|close|0-1>")
+        self.board.send(MSG_GRABBER, struct.pack("<f", closed))
+
     def do_bootloader(self, arg):
         """bootloader: reboot into the UF2 bootloader (stops the thrusters first)"""
         self.board.send(MSG_BOOTLOADER, struct.pack("<I", BOOTLOADER_MAGIC))
@@ -429,8 +441,8 @@ class Shell(cmd.Cmd):
 def main():
     parser = argparse.ArgumentParser(
         description="Talk to the maritime board.",
-        epilog="Commands: status, monitor, thrust, all, one, stop, torpedo, dropper, servo, bootloader. "
-        "With none, an interactive shell.",
+        epilog="Commands: status, monitor, thrust, all, one, stop, torpedo, dropper, grabber, servo, "
+        "bootloader. With none, an interactive shell.",
     )
     parser.add_argument(
         "--port", "-p", help="serial port (default: /dev/maritime, else found by USB ID)"

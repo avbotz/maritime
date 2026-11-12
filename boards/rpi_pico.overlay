@@ -20,8 +20,9 @@
 	};
 
 	/* The grabber servo is the ser-120x model. */
-	/* grabber_servo: grabber_servo {
-	 *	compatible = "pwm-servo";
+	/*
+	 * grabber_servo: grabber_servo {
+	 *	compatible = "avbotz,pwm-servo";
 	 *	pwms = <&pwm 3 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
 	 *	min-pulse = <PWM_USEC(800)>;
 	 *	max-pulse = <PWM_USEC(2100)>;
@@ -32,7 +33,7 @@
 		compatible = "avbotz,killswitch";
 
 		gpios = <&gpio0 28 (GPIO_ACTIVE_HIGH | GPIO_PULL_UP)>;
-		press-debounce-ms = <10>;
+		kill-debounce-ms = <10>;
 		release-debounce-ms = <50>;
 	};
 

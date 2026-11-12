@@ -10,11 +10,14 @@
 
 LOG_MODULE_REGISTER(thrusters, LOG_LEVEL_DBG);
 
-/* Not DT_FOREACH_CHILD_SEP: clang-format turns its (,) into (, ), which checkpatch rejects */
-#define THRUSTER_PWM_SPEC(node_id) PWM_DT_SPEC_GET(node_id),
-
+/*
+ * Disable clang-format to prevent a trailing space after the comma, which checkpatch rejects. Per
+ * the upstream Zephyr style guide, checkpatch is the authoritative source for formatting.
+ */
+/* clang-format off */
 static const struct pwm_dt_spec thruster_devices[] = {
-	DT_FOREACH_CHILD(DT_PATH(thrusters), THRUSTER_PWM_SPEC)};
+	DT_FOREACH_CHILD_SEP(DT_PATH(thrusters), PWM_DT_SPEC_GET, (,))};
+/* clang-format on */
 BUILD_ASSERT(ARRAY_SIZE(thruster_devices) == NUM_THRUSTERS);
 
 static const uint32_t THRUSTER_MIN_PULSE = DT_PROP(DT_PATH(thrusters), min_pulse);
@@ -30,14 +33,14 @@ int thruster_init(void)
 		}
 	}
 	return 0;
-};
+}
 
 void thruster_send_all(const float thrusts[NUM_THRUSTERS])
 {
 	for (int i = 0; i < NUM_THRUSTERS; i++) {
 		thruster_send(i, thrusts[i]);
 	}
-};
+}
 
 void thruster_send_all_uniform(float thrust)
 {
@@ -63,9 +66,11 @@ void thruster_send(int thruster, float thrust)
 	}
 	thrust = CLAMP(thrust, -MAX_POWER, MAX_POWER);
 
-	uint32_t pulse_width =
-		(uint32_t)((thrust + 1.0f) * (THRUSTER_MAX_PULSE - THRUSTER_MIN_PULSE) / 2 +
-			   THRUSTER_MIN_PULSE);
+	/* Normalize thrust (-1.0 to 1.0) to 0.0 to 1.0 */
+	float thrust_norm = (thrust + 1.0f) / 2;
+
+	uint32_t pulse_width = THRUSTER_MIN_PULSE +
+			       (uint32_t)(thrust_norm * (THRUSTER_MAX_PULSE - THRUSTER_MIN_PULSE));
 
 	int ret = pwm_set_pulse_dt(&thruster_devices[thruster], pulse_width);
 

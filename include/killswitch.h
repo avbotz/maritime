@@ -4,7 +4,8 @@
 #include <stdint.h>
 
 enum killswitch_state {
-	/* Killswitch in unkilled position, but hasn't been killed since startup. Require a cycle to
+	/*
+	 * Killswitch in unkilled position, but hasn't been killed since startup. Require a cycle to
 	 * be considered released.
 	 */
 	KILLSWITCH_NEEDS_CYCLE,

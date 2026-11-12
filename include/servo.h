@@ -18,7 +18,7 @@ int servo_set_pulse(enum servo_type type, int pulse_us);
 void servo_drop(int idx, int value);
 void servo_shoot(int idx, int value);
 #if HAVE_GRABBER
-void servo_grab(float value);
+void servo_grab(float closed);
 #endif
 
 #endif /* MARITIME_SERVO_H_ */

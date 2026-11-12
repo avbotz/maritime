@@ -12,12 +12,12 @@ properties:
     required: true
     description: GPIO pin connected to the switch.
 
-  press-debounce-ms:
+  kill-debounce-ms:
     type: int
     default: 0
-    description: Debounce time when pressed (milliseconds).
+    description: Time the switch must read killed (GPIO active) before it counts (milliseconds).
 
   release-debounce-ms:
     type: int
     default: 0
-    description: Debounce time when released (milliseconds).
+    description: Time the switch must read released (GPIO inactive) before it counts (milliseconds).

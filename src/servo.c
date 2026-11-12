@@ -166,22 +166,23 @@ void servo_shoot(int idx, int value)
 }
 
 #if HAVE_GRABBER
-void servo_grab(float value)
+void servo_grab(float closed)
 {
-	/*
-	 * value = the fraction of closed you grabber to be (0 to 1).
-	 * Eg. value = 0.6 = 60% closed grabber.
-	 */
-	LOG_DBG("Setting grabber to %f", value);
+	if (!isfinite(closed)) {
+		LOG_WRN("Grabber position is not finite");
+		return;
+	}
+	closed = CLAMP(closed, 0.0f, 1.0f);
 
-	uint32_t pulse_width =
-		(uint32_t)(grabber_min_pulse + value * (grabber_max_pulse - grabber_min_pulse));
+	const uint32_t pulse_ns =
+		grabber_min_pulse + (uint32_t)(closed * (grabber_max_pulse - grabber_min_pulse));
 
-	int ret = pwm_set_pulse_dt(&grabber_servo, pulse_width);
+	LOG_DBG("Grabber %d%% closed: %u ns", (int)(closed * 100.0f), pulse_ns);
 
-	LOG_DBG("Pulse width %i", pulse_width);
+	int ret = pwm_set_pulse_dt(&grabber_servo, pulse_ns);
+
 	if (ret < 0) {
-		LOG_ERR("Failed to set pulse width/ for grabber, error code %i", ret);
+		LOG_ERR("Failed to set pulse width for grabber, error code %i", ret);
 	}
 }
 #endif
