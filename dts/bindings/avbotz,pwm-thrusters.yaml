@@ -1,0 +1,32 @@
+description: PWM-driven ESC thrusters with one child node per thruster.
+
+compatible: "avbotz,pwm-thrusters"
+
+include: base.yaml
+
+properties:
+  min-pulse:
+    required: true
+    type: int
+    description: Minimum pulse width (nanoseconds).
+
+  max-pulse:
+    required: true
+    type: int
+    description: Maximum pulse width (nanoseconds).
+
+  max-power:
+    required: true
+    type: int
+    min: 0
+    max: 100
+    description: Percent max power (0-100) that can be provided to the thrusters.
+
+child-binding:
+  description: One thruster's ESC PWM signal line.
+
+  properties:
+    pwms:
+      required: true
+      type: phandle-array
+      description: PWM specifier driving the thruster's ESC.

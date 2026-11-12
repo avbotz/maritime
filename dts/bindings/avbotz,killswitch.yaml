@@ -1,0 +1,23 @@
+description: Asymmetrically debounced switch.
+
+compatible: "avbotz,killswitch"
+
+include: base.yaml
+
+properties:
+  gpios:
+    type: phandle-array
+    min-len: 1
+    max-len: 1
+    required: true
+    description: GPIO pin connected to the switch.
+
+  kill-debounce-ms:
+    type: int
+    default: 0
+    description: Time the switch must read killed (GPIO active) before it counts (milliseconds).
+
+  release-debounce-ms:
+    type: int
+    default: 0
+    description: Time the switch must read released (GPIO inactive) before it counts (milliseconds).

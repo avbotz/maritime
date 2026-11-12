@@ -4,15 +4,17 @@
 
 set -euo pipefail
 
-check=false
-case "${1:-}" in
-"") ;;
---check) check=true ;;
-*)
+CHECK_MODE=false
+
+for arg in "$@"; do
+  if [[ "$arg" == "--check" ]]; then
+    CHECK_MODE=true
+    break # Stop searching once found
+  else
     echo "Usage: $0 [--check]" >&2
     exit 2
-    ;;
-esac
+  fi
+done
 
 cd "$(dirname "$0")"
 ZEPHYR_BASE="${ZEPHYR_BASE:-../zephyr}"
@@ -32,7 +34,7 @@ dts_linter() {
 
 status=0
 
-if $check; then
+if $CHECK_MODE; then
     clang-format --dry-run --Werror "${c_files[@]}" || status=1
     dts_linter --format "${dts_args[@]}" || status=1
 else
