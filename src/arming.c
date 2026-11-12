@@ -10,8 +10,6 @@ static const int64_t COMMAND_TIMEOUT_MS = 500;
  * The ESCs must receive a 1500 us pulse for this long so they can initialize properly.
  */
 static const int64_t ESC_INIT_MS = 750;
-/* Depth is re-zeroed on arming only within this of the surface [m] */
-static const float REZERO_LIMIT_M = 0.5f;
 
 enum arming_state {
 	/* Killed, or not yet cycled since startup */
@@ -55,10 +53,10 @@ void arming_update(bool released, int64_t now)
 	case ARMING_KILLED:
 		esc_ready_at = now + ESC_INIT_MS;
 		enter(ARMING_ESC_INIT);
+		pressure_reset_reference();
 		break;
 	case ARMING_ESC_INIT:
 		if (now >= esc_ready_at) {
-			pressure_rezero_near_surface(REZERO_LIMIT_M);
 			enter(ARMING_ARMED);
 		}
 		break;

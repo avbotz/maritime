@@ -4,7 +4,6 @@
 #include <zephyr/drivers/adc.h>
 #include <zephyr/logging/log.h>
 
-#include <math.h>
 #include <stdbool.h>
 
 LOG_MODULE_REGISTER(pressure, LOG_LEVEL_DBG);
@@ -17,10 +16,7 @@ static struct adc_sequence sequence = {
 	.buffer_size = sizeof(sample_buf),
 };
 
-/*
- * Raw ADC reading at the surface: taken at startup, and again at each kill switch release
- * near the surface
- */
+/* Raw ADC reading at the surface. Taken at startup and at each kill switch release */
 static int initial_sample;
 static bool have_initial_sample;
 
@@ -67,11 +63,6 @@ static int pressure_get_raw(void)
 	return sample_buf;
 }
 
-/*
- * The mean of PRESSURE_SAMPLES good readings, or -EIO if the ADC does not give that many
- * in PRESSURE_MAX_READS tries (a disconnected sensor reads 0). Bounded, so a dead sensor
- * cannot hang the main loop and with it the thruster watchdog.
- */
 static int get_raw_averaged_pressure(void)
 {
 	int sum = 0;
@@ -96,18 +87,10 @@ static float raw_to_depth(int raw)
 
 int pressure_reset_reference(void)
 {
-	return pressure_rezero_near_surface(INFINITY);
-}
-
-int pressure_rezero_near_surface(float limit_m)
-{
 	int sample = get_raw_averaged_pressure();
 
 	if (sample < 0) {
 		return sample;
-	}
-	if (have_initial_sample && fabsf(raw_to_depth(sample)) > limit_m) {
-		return -ERANGE;
 	}
 
 	initial_sample = sample;
