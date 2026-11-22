@@ -76,35 +76,35 @@
 		max-current = <75000>;
 
 		thruster0: thruster0 {
-			pwms = <&pwm 9 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+			pwms = <&pwm 9 PWM_HZ(400) PWM_POLARITY_NORMAL>;
 		};
 
 		thruster1: thruster1 {
-			pwms = <&pwm 8 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+			pwms = <&pwm 8 PWM_HZ(400) PWM_POLARITY_NORMAL>;
 		};
 
 		thruster2: thruster2 {
-			pwms = <&pwm 3 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+			pwms = <&pwm 3 PWM_HZ(400) PWM_POLARITY_NORMAL>;
 		};
 
 		thruster3: thruster3 {
-			pwms = <&pwm 2 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+			pwms = <&pwm 2 PWM_HZ(400) PWM_POLARITY_NORMAL>;
 		};
 
 		thruster4: thruster4 {
-			pwms = <&pwm 1 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+			pwms = <&pwm 1 PWM_HZ(400) PWM_POLARITY_NORMAL>;
 		};
 
 		thruster5: thruster5 {
-			pwms = <&pwm 6 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+			pwms = <&pwm 6 PWM_HZ(400) PWM_POLARITY_NORMAL>;
 		};
 
 		thruster6: thruster6 {
-			pwms = <&pwm 7 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+			pwms = <&pwm 7 PWM_HZ(400) PWM_POLARITY_NORMAL>;
 		};
 
 		thruster7: thruster7 {
-			pwms = <&pwm 0 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+			pwms = <&pwm 0 PWM_HZ(400) PWM_POLARITY_NORMAL>;
 		};
 	};
 
