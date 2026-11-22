@@ -19,7 +19,7 @@
 #define PROTOCOL_VERSION 3
 
 /* Host to board */
-#define MSG_THRUSTERS  0x01 /* f32 thrust[8], each between -1 to 1 */
+#define MSG_THRUSTERS  0x01 /* f32 throttle[8], each between -1 to 1 */
 #define MSG_TORPEDO    0x02 /* u8 id (0, 1), u8 open (0, 1) */
 #define MSG_DROPPER    0x03 /* u8 id (0, 1), u8 open (0, 1) */
 #define MSG_GRABBER    0x04 /* f32 closed, from 0 (open) to 1 (closed) */
@@ -44,7 +44,7 @@ struct host_msg {
 	uint8_t type;
 	union {
 		/* MSG_THRUSTERS */
-		float thrusts[PROTOCOL_NUM_THRUSTERS];
+		float throttles[PROTOCOL_NUM_THRUSTERS];
 		/* MSG_TORPEDO, MSG_DROPPER */
 		struct {
 			uint8_t id;

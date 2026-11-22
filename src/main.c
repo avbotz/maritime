@@ -29,7 +29,7 @@ static void handle_msg(const struct host_msg *msg, int64_t now)
 {
 	switch (msg->type) {
 	case MSG_THRUSTERS:
-		arming_command(msg->thrusts, now);
+		arming_command(msg->throttles, now);
 		break;
 	case MSG_TORPEDO:
 		if (msg->actuator.id > 1 || msg->actuator.open > 1) {
@@ -80,7 +80,7 @@ static void handle_msg(const struct host_msg *msg, int64_t now)
 static void send_state(int64_t now)
 {
 	struct board_state state = {
-		/* Reported released only once thrust commands are obeyed */
+		/* Reported released only once throttle commands are obeyed */
 		.killed = !arming_is_armed(),
 		.uptime_ms = (uint32_t)now,
 		.command_timeouts = arming_command_timeouts(),

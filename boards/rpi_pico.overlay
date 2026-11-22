@@ -43,7 +43,37 @@
 		min-pulse = <PWM_USEC(1100)>;
 		max-pulse = <PWM_USEC(1900)>;
 
-		max-power = <60>;
+		max-throttle = <100>;
+
+		/*
+		 * One thruster's current draw: the T200 at 18 V. Data from Blue Robotics T200 technical
+		 * specifications. Line k of current-pulses matches line k of current-milliamps.
+		 */
+		current-pulses = <PWM_USEC(1100) PWM_USEC(1120) PWM_USEC(1140) PWM_USEC(1160)
+				  PWM_USEC(1180) PWM_USEC(1200) PWM_USEC(1220) PWM_USEC(1240)
+				  PWM_USEC(1260) PWM_USEC(1280) PWM_USEC(1300) PWM_USEC(1320)
+				  PWM_USEC(1340) PWM_USEC(1360) PWM_USEC(1380) PWM_USEC(1400)
+				  PWM_USEC(1420) PWM_USEC(1440) PWM_USEC(1460) PWM_USEC(1480)
+				  PWM_USEC(1500) PWM_USEC(1520) PWM_USEC(1540) PWM_USEC(1560)
+				  PWM_USEC(1580) PWM_USEC(1600) PWM_USEC(1620) PWM_USEC(1640)
+				  PWM_USEC(1660) PWM_USEC(1680) PWM_USEC(1700) PWM_USEC(1720)
+				  PWM_USEC(1740) PWM_USEC(1760) PWM_USEC(1780) PWM_USEC(1800)
+				  PWM_USEC(1820) PWM_USEC(1840) PWM_USEC(1860) PWM_USEC(1880)
+				  PWM_USEC(1900)>;
+		current-milliamps = <28215 25380 22210 18850
+				     15800 13270 11320 9550
+				     7770 6000 4790 3680
+				     2730 1900 1300 800
+				     400 200 50 0
+				     0 0 50 200
+				     400 800 1300 1830
+				     2700 3600 4720 5970
+				     7640 9480 11180 13120
+				     15550 18450 21600 24770
+				     27570>;
+
+		/* 75 A across all eight thrusters */
+		max-current = <75000>;
 
 		thruster0: thruster0 {
 			pwms = <&pwm 9 PWM_MSEC(20) PWM_POLARITY_NORMAL>;

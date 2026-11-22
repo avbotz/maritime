@@ -16,7 +16,7 @@ BUILD_ASSERT(sizeof(float) == 4, "float must be 4 bytes");
  * issues with byte ordering and unaligned access (versus using plain types like float or uint16_t).
  */
 struct wire_thrusters {
-	uint8_t thrust[PROTOCOL_NUM_THRUSTERS][4]; /* f32 */
+	uint8_t throttle[PROTOCOL_NUM_THRUSTERS][4]; /* f32 */
 } __packed;
 
 struct wire_actuator {
@@ -132,7 +132,7 @@ static bool decode(const struct raw_frame *raw, struct host_msg *msg)
 	switch (type) {
 	case MSG_THRUSTERS:
 		for (int i = 0; i < PROTOCOL_NUM_THRUSTERS; i++) {
-			msg->thrusts[i] = get_f32(p->thrusters.thrust[i]);
+			msg->throttles[i] = get_f32(p->thrusters.throttle[i]);
 		}
 		break;
 	case MSG_TORPEDO:
