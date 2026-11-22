@@ -44,6 +44,13 @@ child-binding:
   description: One thruster's ESC PWM signal line.
 
   properties:
+    thruster-index:
+      required: true
+      type: int
+      min: 0
+      max: 7
+      description: Index of the thruster in MSG_THRUSTERS.
+
     pwms:
       required: true
       type: phandle-array

@@ -45,10 +45,7 @@
 
 		max-throttle = <100>;
 
-		/*
-		 * One thruster's current draw: the T200 at 18 V. Data from Blue Robotics T200 technical
-		 * specifications. Line k of current-pulses matches line k of current-milliamps.
-		 */
+		/* T200 current draw at 18 V. Data from Blue Robotics T200 technical specs. */
 		current-pulses = <PWM_USEC(1100) PWM_USEC(1120) PWM_USEC(1140) PWM_USEC(1160)
 				  PWM_USEC(1180) PWM_USEC(1200) PWM_USEC(1220) PWM_USEC(1240)
 				  PWM_USEC(1260) PWM_USEC(1280) PWM_USEC(1300) PWM_USEC(1320)
@@ -75,35 +72,43 @@
 		/* 75 A across all eight thrusters */
 		max-current = <75000>;
 
-		thruster0: thruster0 {
+		fwd_port_vert: fwd_port_vert {
+			thruster-index = <0>;
 			pwms = <&pwm 9 PWM_HZ(400) PWM_POLARITY_NORMAL>;
 		};
 
-		thruster1: thruster1 {
+		fwd_stbd_vert: fwd_stbd_vert {
+			thruster-index = <1>;
 			pwms = <&pwm 8 PWM_HZ(400) PWM_POLARITY_NORMAL>;
 		};
 
-		thruster2: thruster2 {
+		aft_port_vert: aft_port_vert {
+			thruster-index = <2>;
 			pwms = <&pwm 3 PWM_HZ(400) PWM_POLARITY_NORMAL>;
 		};
 
-		thruster3: thruster3 {
+		aft_stbd_vert: aft_stbd_vert {
+			thruster-index = <3>;
 			pwms = <&pwm 2 PWM_HZ(400) PWM_POLARITY_NORMAL>;
 		};
 
-		thruster4: thruster4 {
+		fwd_port_horiz: fwd_port_horiz {
+			thruster-index = <4>;
 			pwms = <&pwm 1 PWM_HZ(400) PWM_POLARITY_NORMAL>;
 		};
 
-		thruster5: thruster5 {
+		fwd_stbd_horiz: fwd_stbd_horiz {
+			thruster-index = <5>;
 			pwms = <&pwm 6 PWM_HZ(400) PWM_POLARITY_NORMAL>;
 		};
 
-		thruster6: thruster6 {
+		aft_port_horiz: aft_port_horiz {
+			thruster-index = <6>;
 			pwms = <&pwm 7 PWM_HZ(400) PWM_POLARITY_NORMAL>;
 		};
 
-		thruster7: thruster7 {
+		aft_stbd_horiz: aft_stbd_horiz {
+			thruster-index = <7>;
 			pwms = <&pwm 0 PWM_HZ(400) PWM_POLARITY_NORMAL>;
 		};
 	};
@@ -119,7 +124,7 @@
 	};
 };
 
-/* Uses P0 and P1 by default, which clashes with thrusters 4 and 7. */
+/* Uses P0 and P1 by default, which clashes with aft_stbd_horiz and fwd_port_horiz. */
 &uart0 {
 	status = "disabled";
 };

@@ -8,20 +8,23 @@
 #include <zephyr/math/interpolation.h>
 
 #include <math.h>
-#include <stdint.h>
-
 LOG_MODULE_REGISTER(thrusters, LOG_LEVEL_DBG);
 
 #define THRUSTERS DT_PATH(thrusters)
+
+#define THRUSTER_BIT(node_id)   BIT(DT_PROP(node_id, thruster_index))
+#define THRUSTER_ENTRY(node_id) [DT_PROP(node_id, thruster_index)] = PWM_DT_SPEC_GET(node_id)
 
 /*
  * Disable clang-format to resolve conflicts with checkpatch. Per Zephyr style guide, checkpatch is
  * the authoritative source for formatting.
  */
 /* clang-format off */
-static const struct pwm_dt_spec thruster_devices[] = {DT_FOREACH_CHILD_SEP(THRUSTERS, PWM_DT_SPEC_GET, (,))};
+static const struct pwm_dt_spec thruster_devices[NUM_THRUSTERS] = {DT_FOREACH_CHILD_SEP(THRUSTERS, THRUSTER_ENTRY, (,))};
 /* clang-format on */
-BUILD_ASSERT(ARRAY_SIZE(thruster_devices) == NUM_THRUSTERS);
+BUILD_ASSERT(DT_CHILD_NUM(THRUSTERS) == NUM_THRUSTERS, "wrong number of thrusters");
+BUILD_ASSERT((DT_FOREACH_CHILD_SEP(THRUSTERS, THRUSTER_BIT, (|))) == BIT_MASK(NUM_THRUSTERS),
+	     "thruster-index values must be 0-7, each used once");
 
 static const uint32_t THRUSTER_MIN_PULSE = DT_PROP(THRUSTERS, min_pulse);
 static const uint32_t THRUSTER_MAX_PULSE = DT_PROP(THRUSTERS, max_pulse);
