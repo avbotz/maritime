@@ -91,6 +91,11 @@ jobs:
         working-directory: maritime
         run: west build -b rpi_pico
 
+      - name: Test
+        working-directory: maritime
+        run: |
+          west twister -T tests -p native_sim/native/64 --inline-logs
+
       - name: Upload UF2
         uses: actions/upload-artifact@v7
         with:
