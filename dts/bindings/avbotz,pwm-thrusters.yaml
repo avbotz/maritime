@@ -15,17 +15,42 @@ properties:
     type: int
     description: Maximum pulse width (nanoseconds).
 
-  max-power:
+  max-throttle:
     required: true
     type: int
     min: 0
     max: 100
-    description: Percent max power (0-100) that can be provided to the thrusters.
+    description: Percent max throttle (0-100) that can be provided to any one thruster.
+
+  current-pulses:
+    required: true
+    type: array
+    description: >
+      Pulse widths (nanoseconds), ascending, of the points of one thruster's current curve. Must span
+      min-pulse to max-pulse.
+
+  current-milliamps:
+    required: true
+    type: array
+    description: >
+      Milliamps one thruster draws at the highest battery voltage (18 V) at each of current-pulses.
+
+  max-current:
+    required: true
+    type: int
+    description: Most current (milliamps) the thrusters may draw together.
 
 child-binding:
   description: One thruster's ESC PWM signal line.
 
   properties:
+    thruster-index:
+      required: true
+      type: int
+      min: 0
+      max: 7
+      description: Index of the thruster in MSG_THRUSTERS.
+
     pwms:
       required: true
       type: phandle-array

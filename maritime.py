@@ -160,15 +160,15 @@ class Board:
             except (serial.SerialException, OSError) as e:
                 raise ConnectionError(f"write failed: {e}") from e
 
-    def thrust(self, thrusts):
-        """Sends `thrusts`, then keeps resending them until changed."""
-        self.send(MSG_THRUSTERS, struct.pack(f"<{NUM_THRUSTERS}f", *thrusts))
-        self.hold = tuple(thrusts)
+    def throttle(self, throttles):
+        """Sends `throttles`, then keeps resending them until changed."""
+        self.send(MSG_THRUSTERS, struct.pack(f"<{NUM_THRUSTERS}f", *throttles))
+        self.hold = tuple(throttles)
 
     def close(self):
         if self.hold is not None and self.connected:
             try:
-                self.thrust([0.0] * NUM_THRUSTERS)
+                self.throttle([0.0] * NUM_THRUSTERS)
             except ConnectionError:
                 pass
         self._closing.set()
@@ -302,10 +302,10 @@ def is_text(data: bytes) -> bool:
     return all(32 <= b < 127 or b in b"\r\n\t\x1b" for b in data)
 
 
-def parse_thrust(text: str) -> float:
+def parse_throttle(text: str) -> float:
     value = float(text)
     if not math.isfinite(value) or abs(value) > 1:
-        raise ValueError(f"thrust {text} is not between -1 and 1")
+        raise ValueError(f"throttle {text} is not between -1 and 1")
     return value
 
 
@@ -342,7 +342,7 @@ class Shell(cmd.Cmd):
         return False
 
     def postcmd(self, stop, line):
-        self.prompt = "maritime (thrust held)> " if self.holding() else "maritime> "
+        self.prompt = "maritime (throttle held)> " if self.holding() else "maritime> "
         return stop
 
     def holding(self) -> bool:
@@ -356,7 +356,7 @@ class Shell(cmd.Cmd):
         print(state)
         print(f"bad frames received {self.board.bad_frames}")
         if self.board.hold is not None:
-            print("holding thrust " + " ".join(f"{t:g}" for t in self.board.hold))
+            print("holding throttle " + " ".join(f"{t:g}" for t in self.board.hold))
 
     def do_monitor(self, arg):
         """monitor: print every state the board sends (5 Hz) until Ctrl+C"""
@@ -369,29 +369,29 @@ class Shell(cmd.Cmd):
         finally:
             self.board.watching = False
 
-    def do_thrust(self, arg):
-        """thrust <t0> ... <t7>: hold all eight thrusters (each -1 to 1; the board caps at 0.6)"""
+    def do_throttle(self, arg):
+        """throttle <t0> ... <t7>: hold all eight thrusters (each -1 to 1; the board scales them down if they would draw too much current)"""
         args = arg.split()
         if len(args) != NUM_THRUSTERS:
-            raise ValueError(f"usage: thrust <t0> ... <t{NUM_THRUSTERS - 1}>")
-        self.board.thrust([parse_thrust(a) for a in args])
+            raise ValueError(f"usage: throttle <t0> ... <t{NUM_THRUSTERS - 1}>")
+        self.board.throttle([parse_throttle(a) for a in args])
 
     def do_all(self, arg):
         """all <t>: hold every thruster at t"""
-        self.board.thrust([parse_thrust(arg)] * NUM_THRUSTERS)
+        self.board.throttle([parse_throttle(arg)] * NUM_THRUSTERS)
 
     def do_one(self, arg):
         """one <id> <t>: hold thruster id (0-7) at t and the others at 0"""
         args = arg.split()
         if len(args) != 2 or not args[0].isdigit() or int(args[0]) >= NUM_THRUSTERS:
             raise ValueError(f"usage: one <0-{NUM_THRUSTERS - 1}> <t>")
-        thrusts = [0.0] * NUM_THRUSTERS
-        thrusts[int(args[0])] = parse_thrust(args[1])
-        self.board.thrust(thrusts)
+        throttles = [0.0] * NUM_THRUSTERS
+        throttles[int(args[0])] = parse_throttle(args[1])
+        self.board.throttle(throttles)
 
     def do_stop(self, arg):
         """stop: hold every thruster at 0"""
-        self.board.thrust([0.0] * NUM_THRUSTERS)
+        self.board.throttle([0.0] * NUM_THRUSTERS)
 
     def do_torpedo(self, arg):
         """torpedo <0|1> <open|close>"""
@@ -441,7 +441,7 @@ class Shell(cmd.Cmd):
 def main():
     parser = argparse.ArgumentParser(
         description="Talk to the maritime board.",
-        epilog="Commands: status, monitor, thrust, all, one, stop, torpedo, dropper, grabber, servo, "
+        epilog="Commands: status, monitor, throttle, all, one, stop, torpedo, dropper, grabber, servo, "
         "bootloader. With none, an interactive shell.",
     )
     parser.add_argument(
@@ -465,7 +465,7 @@ def main():
             sys.exit(1)
         if shell.holding():
             # The thrusters run only while this script resends the command
-            print("holding thrust until Ctrl+C")
+            print("holding throttle until Ctrl+C")
             shell.do_monitor("")
     except KeyboardInterrupt:
         print()

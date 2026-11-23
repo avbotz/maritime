@@ -3,10 +3,10 @@
 #include "pressure.h"
 #include "thruster.h"
 
-/* Thrusters go neutral if no thrust command arrives for this long [ms] */
+/* Thrusters go neutral if no throttle command arrives for this long [ms] */
 static const int64_t COMMAND_TIMEOUT_MS = 500;
 /*
- * Time between the kill switch powering up the ESCs and thrust commands being obeyed [ms].
+ * Time between the kill switch powering up the ESCs and throttle commands being obeyed [ms].
  * The ESCs must receive a 1500 us pulse for this long so they can initialize properly.
  */
 static const int64_t ESC_INIT_MS = 750;
@@ -16,9 +16,9 @@ enum arming_state {
 	ARMING_KILLED,
 	/* Released. The ESCs are powering up and get neutral until esc_ready_at */
 	ARMING_ESC_INIT,
-	/* Thrust commands are obeyed, but none have been sent yet or the last timed out */
+	/* Throttle commands are obeyed, but none have been sent yet or the last timed out */
 	ARMING_ARMED,
-	/* Driving on the thrust command that arrived at last_command */
+	/* Driving on the throttle command that arrived at last_command */
 	ARMING_DRIVING,
 };
 
@@ -71,7 +71,7 @@ void arming_update(bool released, int64_t now)
 	}
 }
 
-void arming_command(const float thrusts[NUM_THRUSTERS], int64_t now)
+void arming_command(const float throttles[NUM_THRUSTERS], int64_t now)
 {
 	if (!arming_is_armed()) {
 		return;
@@ -79,7 +79,7 @@ void arming_command(const float thrusts[NUM_THRUSTERS], int64_t now)
 	if (state != ARMING_DRIVING) {
 		enter(ARMING_DRIVING);
 	}
-	thruster_send_all(thrusts);
+	thruster_send_all(throttles);
 	last_command = now;
 }
 

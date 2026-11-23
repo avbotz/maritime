@@ -8,4 +8,7 @@
 /.west
 /build
 
+# Zephyr test files
+twister-out/
+
 __pycache__

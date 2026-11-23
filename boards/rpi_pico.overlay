@@ -43,38 +43,73 @@
 		min-pulse = <PWM_USEC(1100)>;
 		max-pulse = <PWM_USEC(1900)>;
 
-		max-power = <60>;
+		max-throttle = <100>;
 
-		thruster0: thruster0 {
-			pwms = <&pwm 9 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+		/* T200 current draw at 18 V. Data from Blue Robotics T200 technical specs. */
+		current-pulses = <PWM_USEC(1100) PWM_USEC(1120) PWM_USEC(1140) PWM_USEC(1160)
+				  PWM_USEC(1180) PWM_USEC(1200) PWM_USEC(1220) PWM_USEC(1240)
+				  PWM_USEC(1260) PWM_USEC(1280) PWM_USEC(1300) PWM_USEC(1320)
+				  PWM_USEC(1340) PWM_USEC(1360) PWM_USEC(1380) PWM_USEC(1400)
+				  PWM_USEC(1420) PWM_USEC(1440) PWM_USEC(1460) PWM_USEC(1480)
+				  PWM_USEC(1500) PWM_USEC(1520) PWM_USEC(1540) PWM_USEC(1560)
+				  PWM_USEC(1580) PWM_USEC(1600) PWM_USEC(1620) PWM_USEC(1640)
+				  PWM_USEC(1660) PWM_USEC(1680) PWM_USEC(1700) PWM_USEC(1720)
+				  PWM_USEC(1740) PWM_USEC(1760) PWM_USEC(1780) PWM_USEC(1800)
+				  PWM_USEC(1820) PWM_USEC(1840) PWM_USEC(1860) PWM_USEC(1880)
+				  PWM_USEC(1900)>;
+		current-milliamps = <28215 25380 22210 18850
+				     15800 13270 11320 9550
+				     7770 6000 4790 3680
+				     2730 1900 1300 800
+				     400 200 50 0
+				     0 0 50 200
+				     400 800 1300 1830
+				     2700 3600 4720 5970
+				     7640 9480 11180 13120
+				     15550 18450 21600 24770
+				     27570>;
+
+		/* 75 A across all eight thrusters */
+		max-current = <75000>;
+
+		fwd_port_vert: fwd_port_vert {
+			thruster-index = <0>;
+			pwms = <&pwm 9 PWM_HZ(400) PWM_POLARITY_NORMAL>;
 		};
 
-		thruster1: thruster1 {
-			pwms = <&pwm 8 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+		fwd_stbd_vert: fwd_stbd_vert {
+			thruster-index = <1>;
+			pwms = <&pwm 8 PWM_HZ(400) PWM_POLARITY_NORMAL>;
 		};
 
-		thruster2: thruster2 {
-			pwms = <&pwm 3 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+		aft_port_vert: aft_port_vert {
+			thruster-index = <2>;
+			pwms = <&pwm 3 PWM_HZ(400) PWM_POLARITY_NORMAL>;
 		};
 
-		thruster3: thruster3 {
-			pwms = <&pwm 2 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+		aft_stbd_vert: aft_stbd_vert {
+			thruster-index = <3>;
+			pwms = <&pwm 2 PWM_HZ(400) PWM_POLARITY_NORMAL>;
 		};
 
-		thruster4: thruster4 {
-			pwms = <&pwm 1 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+		fwd_port_horiz: fwd_port_horiz {
+			thruster-index = <4>;
+			pwms = <&pwm 1 PWM_HZ(400) PWM_POLARITY_NORMAL>;
 		};
 
-		thruster5: thruster5 {
-			pwms = <&pwm 6 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+		fwd_stbd_horiz: fwd_stbd_horiz {
+			thruster-index = <5>;
+			pwms = <&pwm 6 PWM_HZ(400) PWM_POLARITY_NORMAL>;
 		};
 
-		thruster6: thruster6 {
-			pwms = <&pwm 7 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+		aft_port_horiz: aft_port_horiz {
+			thruster-index = <6>;
+			pwms = <&pwm 7 PWM_HZ(400) PWM_POLARITY_NORMAL>;
 		};
 
-		thruster7: thruster7 {
-			pwms = <&pwm 0 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+		aft_stbd_horiz: aft_stbd_horiz {
+			thruster-index = <7>;
+			pwms = <&pwm 0 PWM_HZ(400) PWM_POLARITY_NORMAL>;
 		};
 	};
 
@@ -89,7 +124,7 @@
 	};
 };
 
-/* Uses P0 and P1 by default, which clashes with thrusters 4 and 7. */
+/* Uses P0 and P1 by default, which clashes with aft_stbd_horiz and fwd_port_horiz. */
 &uart0 {
 	status = "disabled";
 };
